@@ -90,8 +90,8 @@ const deleteBatch = async (req, res) => {
 
     // Remove reference from all students in this batch
     await Student.updateMany(
-      { batchId: batch._id },
-      { $set: { batchId: null } }
+      { batches: batch._id },
+      { $pull: { batches: batch._id } }
     );
 
     await Batch.findByIdAndDelete(req.params.id);
@@ -124,23 +124,20 @@ const assignStudentToBatch = async (req, res) => {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    // Check if student is already in a batch
-    if (student.batchId && student.batchId.toString() !== batchId) {
-       // Remove student from old batch
-       await Batch.findByIdAndUpdate(student.batchId, {
-         $pull: { students: studentId }
-       });
-    }
-
-    // Add student to new batch if not already present
+    // We no longer remove them from other batches (Multi-Batch feature)
+    
+    // Add student to batch if not already present
     if (!batch.students.includes(studentId)) {
         batch.students.push(studentId);
         await batch.save();
     }
 
-    // Update student's batchId
-    student.batchId = batchId;
-    await student.save();
+    // Add batch to student's batches array if not already present
+    if (!student.batches || !student.batches.includes(batchId)) {
+        if (!student.batches) student.batches = [];
+        student.batches.push(batchId);
+        await student.save();
+    }
 
     res.status(200).json({ message: 'Student assigned to batch successfully' });
   } catch (error) {
@@ -174,9 +171,11 @@ const removeStudentFromBatch = async (req, res) => {
     batch.students = batch.students.filter(id => id.toString() !== studentId);
     await batch.save();
 
-    // Remove batch reference from student
-    student.batchId = null;
-    await student.save();
+    // Remove batch reference from student's batches array
+    if (student.batches) {
+      student.batches = student.batches.filter(id => id.toString() !== batchId);
+      await student.save();
+    }
 
     res.status(200).json({ message: 'Student removed from batch successfully' });
   } catch (error) {

@@ -12,10 +12,10 @@ const studentSchema = new mongoose.Schema({
     unique: true,
     trim: true
   },
-  batchId: {
+  batches: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Batch'
-  }
+  }]
 }, {
   timestamps: true
 });

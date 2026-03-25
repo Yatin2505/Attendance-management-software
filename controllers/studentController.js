@@ -6,7 +6,7 @@ const Batch = require('../models/Batch');
 // @access  Private
 const createStudent = async (req, res) => {
   try {
-    const { name, rollNumber, batchId } = req.body;
+    const { name, rollNumber, batches } = req.body;
 
     // Check if student exists by roll number
     const studentExists = await Student.findOne({ rollNumber });
@@ -17,14 +17,16 @@ const createStudent = async (req, res) => {
     const student = await Student.create({
       name,
       rollNumber,
-      batchId: batchId || undefined
+      batches: Array.isArray(batches) ? batches : (batches ? [batches] : [])
     });
 
-    // Add reference to batch if assigned
-    if (batchId) {
-      await Batch.findByIdAndUpdate(batchId, {
-        $push: { students: student._id }
-      });
+    // Add reference to batches if assigned
+    if (student.batches && student.batches.length > 0) {
+      await Promise.all(student.batches.map(bId => 
+        Batch.findByIdAndUpdate(bId, {
+          $push: { students: student._id }
+        })
+      ));
     }
 
     res.status(201).json(student);
@@ -43,13 +45,13 @@ const getStudents = async (req, res) => {
     // Build query object
     let query = {};
     if (batchId) {
-      query.batchId = batchId;
+      query.batches = { $in: [batchId] };
     }
     if (name) {
       query.name = { $regex: name, $options: 'i' };
     }
 
-    const students = await Student.find(query).populate('batchId', 'name timing');
+    const students = await Student.find(query).populate('batches', 'name timing');
     res.status(200).json(students);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -61,7 +63,7 @@ const getStudents = async (req, res) => {
 // @access  Private
 const getStudentById = async (req, res) => {
   try {
-    const student = await Student.findById(req.params.id).populate('batchId', 'name timing');
+    const student = await Student.findById(req.params.id).populate('batches', 'name timing');
 
     if (student) {
       res.status(200).json(student);
@@ -89,27 +91,37 @@ const updateStudent = async (req, res) => {
         }
       }
 
-      const oldBatchId = student.batchId;
-      const newBatchId = req.body.batchId;
+      const oldBatches = student.batches ? student.batches.map(id => id.toString()) : [];
+      let newBatches = req.body.batches;
+      
+      // Normalize to array
+      if (newBatches && !Array.isArray(newBatches)) {
+        newBatches = [newBatches];
+      } else if (!newBatches) {
+        newBatches = [];
+      } else {
+        newBatches = newBatches.map(id => id.toString());
+      }
 
       const updatedStudent = await Student.findByIdAndUpdate(
         req.params.id,
         req.body,
         { new: true, runValidators: true }
-      ).populate('batchId', 'name timing');
+      ).populate('batches', 'name timing');
 
-      // Update Batch array references if the batchId changed
-      if (oldBatchId?.toString() !== newBatchId?.toString()) {
-         if (oldBatchId) {
-            await Batch.findByIdAndUpdate(oldBatchId, {
-               $pull: { students: student._id }
-            });
-         }
-         if (newBatchId) {
-            await Batch.findByIdAndUpdate(newBatchId, {
-               $addToSet: { students: student._id }
-            });
-         }
+      // Calculate diffs for many-to-many propagation
+      const addedBatches = newBatches.filter(b => !oldBatches.includes(b));
+      const removedBatches = oldBatches.filter(b => !newBatches.includes(b));
+
+      if (removedBatches.length > 0) {
+        await Promise.all(removedBatches.map(bId => 
+          Batch.findByIdAndUpdate(bId, { $pull: { students: student._id } })
+        ));
+      }
+      if (addedBatches.length > 0) {
+        await Promise.all(addedBatches.map(bId => 
+          Batch.findByIdAndUpdate(bId, { $addToSet: { students: student._id } })
+        ));
       }
 
       res.status(200).json(updatedStudent);
@@ -129,11 +141,11 @@ const deleteStudent = async (req, res) => {
     const student = await Student.findById(req.params.id);
 
     if (student) {
-      // Remove reference from associated batch
-      if (student.batchId) {
-        await Batch.findByIdAndUpdate(student.batchId, {
-          $pull: { students: student._id }
-        });
+      // Remove reference from all associated batches
+      if (student.batches && student.batches.length > 0) {
+        await Promise.all(student.batches.map(bId => 
+          Batch.findByIdAndUpdate(bId, { $pull: { students: student._id } })
+        ));
       }
 
       await student.deleteOne();

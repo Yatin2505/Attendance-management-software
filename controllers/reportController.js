@@ -20,12 +20,12 @@ const getStudentReport = async (req, res) => {
 
     const matchStage = { $match: { studentId: studentIdObj } };
     
-    // Aggregate overall attendance
+    // Aggregate attendance grouped by Batch
     const report = await Attendance.aggregate([
       matchStage,
       {
         $group: {
-          _id: '$studentId',
+          _id: '$batchId',
           totalDays: { $sum: 1 },
           presentDays: {
             $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] }
@@ -34,26 +34,59 @@ const getStudentReport = async (req, res) => {
             $sum: { $cond: [{ $eq: ['$status', 'absent'] }, 1, 0] }
           }
         }
-      }
+      },
+      {
+        $lookup: {
+          from: 'batches',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'batchInfo'
+        }
+      },
+      { $unwind: { path: '$batchInfo', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          batchId: '$_id',
+          batchName: { $ifNull: ['$batchInfo.name', 'Deleted Batch'] },
+          totalDays: 1,
+          presentDays: 1,
+          absentDays: 1,
+          percentage: {
+            $cond: [
+              { $gt: ['$totalDays', 0] },
+              { $multiply: [ { $divide: ['$presentDays', '$totalDays'] }, 100 ] },
+              0
+            ]
+          }
+        }
+      },
+      { $sort: { batchName: 1 } }
     ]);
 
-    if (report.length === 0) {
-      return res.status(404).json({ message: 'No attendance records found for this student' });
-    }
-
-    const data = report[0];
-    const percentage = getPercentage(data.presentDays, data.totalDays);
+    // Calculate global stats dynamically
+    let globalTotal = 0, globalPresent = 0, globalAbsent = 0;
+    
+    const batchReports = report.map(r => {
+      globalTotal += r.totalDays;
+      globalPresent += r.presentDays;
+      globalAbsent += r.absentDays;
+      return {
+        ...r,
+        percentage: Number(r.percentage.toFixed(2))
+      };
+    });
 
     const student = await Student.findById(studentId).select('name rollNumber');
 
     res.status(200).json({
       student,
       stats: {
-        totalDays: data.totalDays,
-        presentDays: data.presentDays,
-        absentDays: data.absentDays,
-        percentage
-      }
+        totalDays: globalTotal,
+        presentDays: globalPresent,
+        absentDays: globalAbsent,
+        percentage: getPercentage(globalPresent, globalTotal)
+      },
+      batchReports
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

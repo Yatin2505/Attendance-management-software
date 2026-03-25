@@ -16,7 +16,7 @@ const Students = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentStudent, setCurrentStudent] = useState(null);
-  const [formData, setFormData] = useState({ name: '', rollNumber: '', batchId: '' });
+  const [formData, setFormData] = useState({ name: '', rollNumber: '', batches: [] });
 
   useEffect(() => {
     fetchData();
@@ -45,19 +45,19 @@ const Students = () => {
       setFormData({
         name: student.name,
         rollNumber: student.rollNumber,
-        batchId: student.batchId?._id || student.batchId || ''
+        batches: student.batches ? student.batches.map(b => b._id || b) : []
       });
     } else {
       setIsEditing(false);
       setCurrentStudent(null);
-      setFormData({ name: '', rollNumber: '', batchId: '' });
+      setFormData({ name: '', rollNumber: '', batches: [] });
     }
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setFormData({ name: '', rollNumber: '', batchId: '' });
+    setFormData({ name: '', rollNumber: '', batches: [] });
   };
 
   const handleSubmit = async (e) => {
@@ -92,9 +92,12 @@ const Students = () => {
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           student.rollNumber.toLowerCase().includes(searchTerm.toLowerCase());
-    const studentBatchId = student.batchId?._id || student.batchId;
-    const matchesBatch = filterBatch ? studentBatchId === filterBatch : true;
-    return matchesSearch && matchesBatch;
+                          
+    const passesBatchFilter = filterBatch 
+      ? student.batches && student.batches.some(b => (b._id || b) === filterBatch)
+      : true;
+      
+    return matchesSearch && passesBatchFilter;
   });
 
   return (
@@ -160,10 +163,14 @@ const Students = () => {
                     <td className="py-4 px-6 font-medium text-gray-800">{student.name}</td>
                     <td className="py-4 px-6 text-gray-600">{student.rollNumber}</td>
                     <td className="py-4 px-6">
-                      {student.batchId ? (
-                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                           {student.batchId.name || batches.find(b => b._id === student.batchId)?.name || 'Assigned'}
-                         </span>
+                      {student.batches && student.batches.length > 0 ? (
+                         <div className="flex flex-wrap gap-2">
+                           {student.batches.map((b, idx) => (
+                             <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                               {b.name || batches.find(bat => bat._id === (b._id || b))?.name || 'Assigned'}
+                             </span>
+                           ))}
+                         </div>
                       ) : (
                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                            Unassigned
@@ -226,17 +233,29 @@ const Students = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Assign Batch (Optional)</label>
-                <select 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                  value={formData.batchId}
-                  onChange={(e) => setFormData({...formData, batchId: e.target.value})}
-                >
-                  <option value="">-- No Batch --</option>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Assign Batches</label>
+                <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-lg p-2 space-y-2 bg-gray-50">
                   {batches.map(batch => (
-                    <option key={batch._id} value={batch._id}>{batch.name}</option>
+                    <label key={batch._id} className="flex items-center space-x-3 bg-white p-2 rounded border border-gray-100 shadow-sm cursor-pointer hover:bg-indigo-50 transition">
+                      <input 
+                        type="checkbox" 
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
+                        checked={formData.batches.includes(batch._id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormData({...formData, batches: [...formData.batches, batch._id]});
+                          } else {
+                            setFormData({...formData, batches: formData.batches.filter(id => id !== batch._id)});
+                          }
+                        }}
+                      />
+                      <span className="text-sm text-gray-800 font-medium">{batch.name} <span className="text-xs text-gray-500 font-normal">({batch.timing})</span></span>
+                    </label>
                   ))}
-                </select>
+                  {batches.length === 0 && (
+                    <div className="text-sm text-gray-500 p-2 text-center">No batches available. Please create one first.</div>
+                  )}
+                </div>
               </div>
               <div className="pt-4 flex justify-end space-x-3">
                 <button 
