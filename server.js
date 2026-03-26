@@ -17,11 +17,39 @@ const app = express();
 connectDB();
 
 // Middleware
-// app.use(cors());
+const ALLOWED_ORIGINS = [
+  "https://attendance-management-software-nine.vercel.app",
+  "http://localhost:5173",   // local dev
+  "http://localhost:3000"
+];
+
 app.use(cors({
-  origin: "*"
-}))
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. mobile apps, curl)
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: origin ${origin} not allowed`));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json());
+
+// Health & root info endpoints
+app.get('/', (req, res) => {
+  res.json({
+    name: 'Tecno Skill Attendance Management API',
+    version: '1.0.0',
+    status: 'running',
+    timestamp: new Date().toISOString(),
+    docs: 'Use /health to check service health'
+  });
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
 
 // Routes
 app.use('/api', testRoutes);

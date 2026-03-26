@@ -1,17 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
+  const [serverStatus, setServerStatus] = useState('idle'); // 'idle' | 'waking' | 'ready'
+
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const from = location.state?.from?.pathname || "/";
+
+  // Detect Render cold start: ping /health, show banner if slow
+  useEffect(() => {
+    let timer;
+    let done = false;
+    timer = setTimeout(() => {
+      if (!done) setServerStatus('waking');
+    }, 1800);
+
+    fetch(`${API_URL}/health`)
+      .then(() => {
+        done = true;
+        clearTimeout(timer);
+        setServerStatus('ready');
+        // Hide the "ready" banner after 3s
+        setTimeout(() => setServerStatus('idle'), 3000);
+      })
+      .catch(() => {
+        done = true;
+        clearTimeout(timer);
+        setServerStatus('waking');
+      });
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,6 +56,20 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
+      {/* Cold-start warning banner */}
+      {serverStatus === 'waking' && (
+        <div style={{position:'fixed',top:0,left:0,right:0,zIndex:50,background:'#fef3c7',borderBottom:'1px solid #f59e0b',padding:'10px 16px',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',fontSize:'13px',color:'#92400e'}}>
+          <svg style={{width:16,height:16,flexShrink:0,animation:'spin 1s linear infinite'}} viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <span><strong>Server is waking up</strong> — Render free tier sleeps after inactivity. This may take up to 30 seconds. Please wait…</span>
+        </div>
+      )}
+      {serverStatus === 'ready' && (
+        <div style={{position:'fixed',top:0,left:0,right:0,zIndex:50,background:'#d1fae5',borderBottom:'1px solid #34d399',padding:'10px 16px',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',fontSize:'13px',color:'#065f46'}}>
+          <svg style={{width:16,height:16}} viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+          <span><strong>Server is ready!</strong> You can now sign in.</span>
+        </div>
+      )}
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       <div className="max-w-md w-full space-y-8 premium-card bg-white p-10">
         <div>
           <div className="mx-auto w-12 h-12 bg-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
