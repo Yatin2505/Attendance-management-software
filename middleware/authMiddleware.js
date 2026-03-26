@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Batch = require('../models/Batch');
 
+// @desc    Protect routes — verify JWT and attach user to req
 const protect = async (req, res, next) => {
   let token;
 
@@ -14,7 +16,7 @@ const protect = async (req, res, next) => {
 
       // Get user from the token
       req.user = await User.findById(decoded.id).select('-password').lean();
-      
+
       if (!req.user) {
         return res.status(401).json({ message: 'Not authorized, user not found' });
       }
@@ -23,14 +25,12 @@ const protect = async (req, res, next) => {
     } catch (error) {
       res.status(401).json({ message: 'Not authorized, token failed' });
     }
-  }
-
-  if (!token) {
+  } else if (!token) {
     res.status(401).json({ message: 'Not authorized, no token' });
   }
 };
 
-// New: Teacher batch auth middleware
+// @desc    Authorize teacher to only access their own batches; admins bypass
 const authorizeTeacherBatch = async (req, res, next) => {
   try {
     const batchId = req.params.id || req.body.batchId;
@@ -41,11 +41,10 @@ const authorizeTeacherBatch = async (req, res, next) => {
     // Admins have full access
     if (user.role === 'admin') return next();
 
-    // Teachers only own batches
+    // Teachers can only access their own batches
     if (user.role === 'teacher') {
-      const { Batch } = await import('../models/Batch.js');
       const batch = await Batch.findById(batchId).lean();
-      if (!batch || batch.teacherId.toString() !== user.id) {
+      if (!batch || batch.teacherId.toString() !== user._id.toString()) {
         return res.status(403).json({ message: 'Access denied: Not your batch' });
       }
       return next();
@@ -57,6 +56,5 @@ const authorizeTeacherBatch = async (req, res, next) => {
   }
 };
 
+// Single, correct export of both middleware functions
 module.exports = { protect, authorizeTeacherBatch };
-
-module.exports = { protect };

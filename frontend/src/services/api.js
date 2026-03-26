@@ -24,10 +24,16 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      // Only redirect to /login if we're NOT already on an auth page
+      // Prevents an infinite redirect loop / Vercel 404 when login fails
+      const isAuthPage = ['/login', '/register'].some(path =>
+        window.location.pathname.startsWith(path)
+      );
+      if (!isAuthPage) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

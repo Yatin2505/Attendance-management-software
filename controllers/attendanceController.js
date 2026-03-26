@@ -28,11 +28,12 @@ const markAttendance = async (req, res) => {
 
     const existingRecord = await Attendance.findOne({
       studentId,
+      batchId,
       date: { $gte: attendanceDate, $lt: nextDay }
     });
 
     if (existingRecord) {
-      return res.status(400).json({ message: 'Attendance already marked for this student on this date' });
+      return res.status(400).json({ message: 'Attendance already marked for this student in this batch on this date' });
     }
 
     const attendance = await Attendance.create({
@@ -87,6 +88,7 @@ const markAllPresent = async (req, res) => {
         const attendance = await Attendance.create({
           studentId: student._id,
           batchId: batch._id,
+          teacherId: req.user.id,
           date: attendanceDate,
           status: 'present'
         });
@@ -164,8 +166,8 @@ const updateAttendance = async (req, res) => {
   try {
     const { status } = req.body;
 
-    if (!['present', 'absent'].includes(status)) {
-        return res.status(400).json({ message: 'Status must be either present or absent' });
+    if (!['present', 'absent', 'late'].includes(status)) {
+        return res.status(400).json({ message: 'Status must be present, absent, or late' });
     }
 
     const attendance = await Attendance.findById(req.params.id);
