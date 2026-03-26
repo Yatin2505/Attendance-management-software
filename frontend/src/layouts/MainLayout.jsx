@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
+import DarkToggle from '../components/DarkToggle';
+import TecnoSkillLogo from '../components/TecnoSkillLogo';
 
 const MainLayout = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -93,16 +95,18 @@ const MainLayout = () => {
              </h2>
           </div>
           
-          <div className="flex items-center space-x-5">
-             <div className="hidden sm:flex flex-col text-right mr-2">
-                <span className="text-sm font-bold text-slate-800">Admin User</span>
-                <span className="text-xs text-slate-500 font-medium tracking-wide">Administrator</span>
-             </div>
-             <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold shadow-md shadow-indigo-200 ring-4 ring-white">
-               A
-             </div>
+          <div className="flex items-center space-x-3">
+            <DarkToggle />
+            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
+            <div className="hidden sm:flex flex-col text-right mr-2">
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-200">Admin User</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium tracking-wide">Administrator</span>
+            </div>
+            <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-primary-500 to-primary-600 dark:from-purple-600 dark:to-purple-700 flex items-center justify-center text-white font-bold shadow-md shadow-primary-200 dark:shadow-purple-200 ring-4 ring-white dark:ring-slate-800">
+              A
+            </div>
           </div>
-        </header>
+         </header>
 
         {/* Scrollable Page Content */}
         <main className="flex-1 overflow-x-hidden overflow-y-auto p-6 lg:p-10">
