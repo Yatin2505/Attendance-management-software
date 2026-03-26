@@ -1,0 +1,153 @@
+﻿
+> frontend@0.0.0 build
+> vite build
+
+[36mvite v8.0.2 [32mbuilding client environment for production...[36m[39m
+[2K
+transforming...Γ£ô 2520 modules transformed.
+node.exe : [31mΓ£ù[39m 
+Build failed in 385ms
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: ([31mΓ£  
+  ù[39m Build failed in 3   
+ 85ms:String) [], RemoteE    
+xception
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+[31merror during build:
+[31mBuild failed with 1 
+error:
+
+[plugin @tailwindcss/vite:gen
+erate:build] 
+C:/Users/Computer House/Deskt
+op/Yatin/Practice/sanketsir-t
+asks/attendance-software/fron
+tend/src/index.css
+Error: Cannot apply unknown 
+utility class `dark:hover:bg-
+primary-900/10`
+    at onInvalidCandidate (fi
+le:///C:/Users/Computer%20Hou
+se/Desktop/Yatin/Practice/san
+ketsir-tasks/attendance-softw
+are/frontend/node_modules/tai
+lwindcss/dist/chunk-F4544Y4M.
+mjs:21:1511)
+    at $e (file:///C:/Users/C
+omputer%20House/Desktop/Yatin
+/Practice/sanketsir-tasks/att
+endance-software/frontend/nod
+e_modules/tailwindcss/dist/ch
+unk-F4544Y4M.mjs:16:37066)
+    at file:///C:/Users/Compu
+ter%20House/Desktop/Yatin/Pra
+ctice/sanketsir-tasks/attenda
+nce-software/frontend/node_mo
+dules/tailwindcss/dist/chunk-
+F4544Y4M.mjs:21:355
+    at Cr (file:///C:/Users/C
+omputer%20House/Desktop/Yatin
+/Practice/sanketsir-tasks/att
+endance-software/frontend/nod
+e_modules/tailwindcss/dist/ch
+unk-F4544Y4M.mjs:3:1733)
+    at _ (file:///C:/Users/Co
+mputer%20House/Desktop/Yatin/
+Practice/sanketsir-tasks/atte
+ndance-software/frontend/node
+_modules/tailwindcss/dist/chu
+nk-F4544Y4M.mjs:3:1377)
+    at Ce (file:///C:/Users/C
+omputer%20House/Desktop/Yatin
+/Practice/sanketsir-tasks/att
+endance-software/frontend/nod
+e_modules/tailwindcss/dist/ch
+unk-F4544Y4M.mjs:21:172)
+    at Zi (file:///C:/Users/C
+omputer%20House/Desktop/Yatin
+/Practice/sanketsir-tasks/att
+endance-software/frontend/nod
+e_modules/tailwindcss/dist/ch
+unk-F4544Y4M.mjs:38:294)
+    at async ua (file:///C:/U
+sers/Computer%20House/Desktop
+/Yatin/Practice/sanketsir-tas
+ks/attendance-software/fronte
+nd/node_modules/tailwindcss/d
+ist/chunk-F4544Y4M.mjs:38:631
+)
+    at async yf (file:///C:/U
+sers/Computer%20House/Desktop
+/Yatin/Practice/sanketsir-tas
+ks/attendance-software/fronte
+nd/node_modules/tailwindcss/d
+ist/chunk-F4544Y4M.mjs:38:140
+6)
+    at async uu (file:///C:/U
+sers/Computer%20House/Desktop
+/Yatin/Practice/sanketsir-tas
+ks/attendance-software/fronte
+nd/node_modules/@tailwindcss/
+node/dist/index.mjs:10:3457)
+[31m
+    at aggregateBindingErrors
+IntoJsError (file:///C:/Users
+/Computer%20House/Desktop/Yat
+in/Practice/sanketsir-tasks/a
+ttendance-software/frontend/n
+ode_modules/rolldown/dist/sha
+red/error-D8cGyrC7.mjs:48:18)
+    at unwrapBindingResult (f
+ile:///C:/Users/Computer%20Ho
+use/Desktop/Yatin/Practice/sa
+nketsir-tasks/attendance-soft
+ware/frontend/node_modules/ro
+lldown/dist/shared/error-D8cG
+yrC7.mjs:18:128)
+    at #build (file:///C:/Use
+rs/Computer%20House/Desktop/Y
+atin/Practice/sanketsir-tasks
+/attendance-software/frontend
+/node_modules/rolldown/dist/s
+hared/rolldown-build-CL9PyQ2E
+.mjs:3313:34)
+    at async 
+buildEnvironment (file:///C:/
+Users/Computer%20House/Deskto
+p/Yatin/Practice/sanketsir-ta
+sks/attendance-software/front
+end/node_modules/vite/dist/no
+de/chunks/node.js:32829:64)
+    at async Object.build (fi
+le:///C:/Users/Computer%20Hou
+se/Desktop/Yatin/Practice/san
+ketsir-tasks/attendance-softw
+are/frontend/node_modules/vit
+e/dist/node/chunks/node.js:33
+251:19)
+    at async Object.buildApp 
+(file:///C:/Users/Computer%20
+House/Desktop/Yatin/Practice/
+sanketsir-tasks/attendance-so
+ftware/frontend/node_modules/
+vite/dist/node/chunks/node.js
+:33248:153)
+    at async CAC.<anonymous> 
+(file:///C:/Users/Computer%20
+House/Desktop/Yatin/Practice/
+sanketsir-tasks/attendance-so
+ftware/frontend/node_modules/
+vite/dist/node/cli.js:778:3) 
+{
+  errors: [Getter/Setter]
+}[39m
