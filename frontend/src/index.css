@@ -3,16 +3,30 @@
 @import "tailwindcss";
 
 @theme {
+  --color-primary-500: #6C61FF;
+  --color-primary-600: #5A4FD6;
+  --color-primary-100: #C4B5FD;
+  --color-primary-50: #EDE9FE;
+  
   --color-brand-primary: #4F46E5;
   --color-brand-secondary: #818CF8;
-  --color-brand-accent: #312E81;
   
   --font-sans: 'Inter', system-ui, sans-serif;
 }
 
 @layer base {
+  :root {
+    --primary: theme('colors.primary.500');
+    --primary-light: theme('colors.primary.100');
+  }
+
+  [data-theme="dark"] {
+    --primary: theme('colors.primary.600');
+    --primary-light: theme('colors.primary.50');
+  }
+
   body {
-    @apply bg-slate-50 text-slate-800 antialiased;
+    @apply bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 antialiased transition-colors duration-200;
     font-family: 'Inter', sans-serif;
   }
 }

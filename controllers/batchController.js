@@ -6,15 +6,20 @@ const Student = require('../models/Student');
 // @access  Private
 const createBatch = async (req, res) => {
   try {
-    const { name, timing } = req.body;
+    const { name, timing, teacherId } = req.body;
+    const userId = req.user.id; // From auth middleware
 
     if (!name) {
       return res.status(400).json({ message: 'Please provide a batch name' });
+    }
+    if (req.user.role !== 'admin' && userId !== teacherId) {
+      return res.status(403).json({ message: 'Only admins or assigned teachers can create batches' });
     }
 
     const batch = await Batch.create({
       name,
       timing,
+      teacherId: teacherId || userId, // Admin can assign, teacher self-assigns
       students: []
     });
 
@@ -29,7 +34,14 @@ const createBatch = async (req, res) => {
 // @access  Private
 const getBatches = async (req, res) => {
   try {
-    const batches = await Batch.find().populate('students', 'name rollNumber');
+    const userId = req.user.id;
+    let query = {};
+    
+    if (req.user.role === 'teacher') {
+      query = { teacherId: userId };
+    }
+    
+    const batches = await Batch.find(query).populate('students', 'name rollNumber').populate('teacherId', 'name');
     res.status(200).json(batches);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

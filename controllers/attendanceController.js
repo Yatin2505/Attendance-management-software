@@ -7,21 +7,22 @@ const Batch = require('../models/Batch');
 // @access  Private
 const markAttendance = async (req, res) => {
   try {
-    const { studentId, batchId, date, status } = req.body;
+    const { studentId, batchId, date, status, notes } = req.body;
+    const teacherId = req.user.id;
 
     if (!studentId || !batchId || !date || !status) {
       return res.status(400).json({ message: 'Please provide studentId, batchId, date, and status' });
     }
 
-    if (!['present', 'absent'].includes(status)) {
-        return res.status(400).json({ message: 'Status must be either present or absent' });
+    if (!['present', 'absent', 'late'].includes(status)) {
+        return res.status(400).json({ message: 'Status must be present, absent, or late' });
     }
 
-    // Normalize date to start of the day to prevent duplicates on the exact same chronological day
+    // Normalize date to start of the day
     const attendanceDate = new Date(date);
     attendanceDate.setHours(0, 0, 0, 0);
 
-    // Prevent duplicate: A student should not have multiple attendance records for the same date
+    // Prevent duplicate
     const nextDay = new Date(attendanceDate);
     nextDay.setDate(nextDay.getDate() + 1);
 
@@ -37,8 +38,10 @@ const markAttendance = async (req, res) => {
     const attendance = await Attendance.create({
       studentId,
       batchId,
+      teacherId,
       date: attendanceDate,
-      status
+      status,
+      notes: notes || ''
     });
 
     res.status(201).json(attendance);

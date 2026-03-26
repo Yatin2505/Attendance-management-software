@@ -11,6 +11,11 @@ const attendanceSchema = new mongoose.Schema({
     ref: 'Batch',
     required: true
   },
+  teacherId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
   date: {
     type: Date,
     required: true,
@@ -18,8 +23,12 @@ const attendanceSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['present', 'absent'],
+    enum: ['present', 'absent', 'late'],
     required: true
+  },
+  notes: {
+    type: String,
+    default: ''
   }
 }, {
   timestamps: true
