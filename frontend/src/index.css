@@ -2,15 +2,13 @@
 
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
-
 @theme {
   --color-primary-900: #312e81;
   --color-primary-600: #4f46e5;
   --color-primary-500: #6366f1;
   --color-primary-100: #e0e7ff;
   --color-primary-50: #f0f3ff;
-  
+
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-display: 'Outfit', system-ui, sans-serif;
 }
@@ -20,15 +18,20 @@
     @apply bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 antialiased transition-colors duration-300;
     font-family: var(--font-sans);
   }
-  
-  h1, h2, h3, h4, h5, h6 {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-display);
   }
 }
 
 /* Premium smooth transitions class */
 .premium-card {
-  @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/20 dark:border-slate-800/50 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] transition-all duration-300 hover:shadow-[0_8px_30px_rgb(99,102,241,0.1)] hover:-translate-y-1;
+  @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/20 dark:border-slate-800/50 rounded-2xl shadow-[0_8px_30px_rgb(0, 0, 0, 0.04)] dark:shadow-[0_8px_30px_rgb(0, 0, 0, 0.2)] transition-all duration-300 hover:shadow-[0_8px_30px_rgb(99, 102, 241, 0.1)] hover:-translate-y-1;
 }
 
 /* Glass Panels */
@@ -60,12 +63,15 @@
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   @apply bg-slate-200 dark:bg-slate-800 rounded-full;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-slate-300 dark:bg-slate-700;
 }
@@ -73,16 +79,16 @@
 /* Dynamic Gradients */
 .bg-mesh-light {
   background-color: #fafafa;
-  background-image: 
-    radial-gradient(at 40% 20%, hsla(250,100%,74%,0.15) 0px, transparent 50%),
-    radial-gradient(at 80% 0%, hsla(189,100%,56%,0.15) 0px, transparent 50%),
-    radial-gradient(at 0% 50%, hsla(355,100%,93%,0.1) 0px, transparent 50%);
+  background-image:
+    radial-gradient(at 40% 20%, hsla(250, 100%, 74%, 0.15) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, hsla(189, 100%, 56%, 0.15) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, hsla(355, 100%, 93%, 0.1) 0px, transparent 50%);
 }
 
 .bg-mesh-dark {
   background-color: #020617;
-  background-image: 
-    radial-gradient(at 40% 20%, hsla(250,100%,74%,0.1) 0px, transparent 50%),
-    radial-gradient(at 80% 0%, hsla(189,100%,56%,0.05) 0px, transparent 50%),
-    radial-gradient(at 0% 50%, hsla(250,100%,15%,0.3) 0px, transparent 50%);
+  background-image:
+    radial-gradient(at 40% 20%, hsla(250, 100%, 74%, 0.1) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, hsla(189, 100%, 56%, 0.05) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, hsla(250, 100%, 15%, 0.3) 0px, transparent 50%);
 }
