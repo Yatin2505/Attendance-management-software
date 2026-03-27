@@ -2,65 +2,63 @@ const Attendance = require('../models/Attendance');
 const Student = require('../models/Student');
 const Batch = require('../models/Batch');
 
-// @desc    Mark attendance for a student (present/absent)
+// Helper: normalize a date to UTC midnight
+const toUTCMidnight = (dateInput) => {
+  const d = new Date(dateInput);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+};
+
+// Helper: check if a user can access a batch
+const canAccessBatch = (user, batch) => {
+  if (user.role === 'admin') return true;
+  if (!batch.teacherId) return false;
+  return batch.teacherId.toString() === user.id;
+};
+
+// @desc    Mark attendance for a student (upsert — creates or updates)
 // @route   POST /api/attendance
 // @access  Private
 const markAttendance = async (req, res) => {
   try {
     const { studentId, batchId, date, status, notes } = req.body;
-    const teacherId = req.user.id;
 
     if (!studentId || !batchId || !date || !status) {
       return res.status(400).json({ message: 'Please provide studentId, batchId, date, and status' });
     }
 
+    if (!['present', 'absent', 'late'].includes(status)) {
+      return res.status(400).json({ message: 'Status must be present, absent, or late' });
+    }
+
     const batch = await Batch.findById(batchId);
     if (!batch) return res.status(404).json({ message: 'Batch not found' });
-    
-    if (req.user.role !== 'admin') {
-      if (!batch.teacherId || batch.teacherId.toString() !== req.user.id) {
-        return res.status(403).json({ message: 'Not authorized to mark attendance for this batch' });
-      }
+
+    if (!canAccessBatch(req.user, batch)) {
+      return res.status(403).json({ message: 'Not authorized to mark attendance for this batch' });
     }
 
-    if (!['present', 'absent', 'late'].includes(status)) {
-        return res.status(400).json({ message: 'Status must be present, absent, or late' });
-    }
+    const attendanceDate = toUTCMidnight(date);
 
-    // Normalize date to start of the day
-    const attendanceDate = new Date(date);
-    attendanceDate.setHours(0, 0, 0, 0);
+    // Upsert: update if exists, create if not — avoids duplicate key errors
+    const attendance = await Attendance.findOneAndUpdate(
+      { studentId, batchId, date: attendanceDate },
+      {
+        $set: {
+          status,
+          teacherId: req.user.id,
+          notes: notes || ''
+        }
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
 
-    // Prevent duplicate
-    const nextDay = new Date(attendanceDate);
-    nextDay.setDate(nextDay.getDate() + 1);
-
-    const existingRecord = await Attendance.findOne({
-      studentId,
-      batchId,
-      date: { $gte: attendanceDate, $lt: nextDay }
-    });
-
-    if (existingRecord) {
-      return res.status(400).json({ message: 'Attendance already marked for this student in this batch on this date' });
-    }
-
-    const attendance = await Attendance.create({
-      studentId,
-      batchId,
-      teacherId,
-      date: attendanceDate,
-      status,
-      notes: notes || ''
-    });
-
-    res.status(201).json(attendance);
+    res.status(200).json(attendance);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// @desc    Mark all students in a batch as present for a given date
+// @desc    Mark all students in a batch as present for a given date (upsert)
 // @route   POST /api/attendance/mark-all
 // @access  Private
 const markAllPresent = async (req, res) => {
@@ -75,47 +73,32 @@ const markAllPresent = async (req, res) => {
     if (!batch) {
       return res.status(404).json({ message: 'Batch not found' });
     }
-    
-    if (req.user.role !== 'admin') {
-      if (!batch.teacherId || batch.teacherId.toString() !== req.user.id) {
-        return res.status(403).json({ message: 'Not authorized to mark attendance for this batch' });
-      }
+
+    if (!canAccessBatch(req.user, batch)) {
+      return res.status(403).json({ message: 'Not authorized to mark attendance for this batch' });
     }
 
-    const attendanceDate = new Date(date);
-    attendanceDate.setHours(0, 0, 0, 0);
+    const attendanceDate = toUTCMidnight(date);
+    const results = [];
 
-    const nextDay = new Date(attendanceDate);
-    nextDay.setDate(nextDay.getDate() + 1);
-
-    const createdRecords = [];
-    const skippedRecords = [];
-
-    // Process each student in the batch
     for (const student of batch.students) {
-      // Check if attendance already exists for this student on this date
-      const existingRecord = await Attendance.findOne({
-        studentId: student._id,
-        date: { $gte: attendanceDate, $lt: nextDay }
-      });
-
-      if (!existingRecord) {
-        const attendance = await Attendance.create({
-          studentId: student._id,
-          batchId: batch._id,
-          teacherId: req.user.id,
-          date: attendanceDate,
-          status: 'present'
-        });
-        createdRecords.push(attendance);
-      } else {
-        skippedRecords.push(student._id);
-      }
+      const record = await Attendance.findOneAndUpdate(
+        { studentId: student._id, batchId: batch._id, date: attendanceDate },
+        {
+          $setOnInsert: {
+            status: 'present',
+            teacherId: req.user.id,
+            notes: ''
+          }
+        },
+        { upsert: true, new: true }
+      );
+      results.push(record);
     }
 
-    res.status(201).json({
-      message: `Marked ${createdRecords.length} students as present. Skipped ${skippedRecords.length} duplicates.`,
-      createdRecords
+    res.status(200).json({
+      message: `Marked ${results.length} students as present.`,
+      createdRecords: results
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -128,13 +111,18 @@ const markAllPresent = async (req, res) => {
 const getAttendance = async (req, res) => {
   try {
     const { date, batchId, studentId } = req.query;
-    
+
     let query = {};
-    
+
     // Teacher scope isolation
     if (req.user.role === 'teacher') {
       const myBatches = await Batch.find({ teacherId: req.user.id }).select('_id');
       const myBatchIds = myBatches.map(b => b._id.toString());
+
+      if (myBatchIds.length === 0) {
+        return res.status(200).json([]); // No assigned batches — return empty, not 403
+      }
+
       if (batchId && !myBatchIds.includes(batchId)) {
         return res.status(403).json({ message: 'Not authorized to view this batch' });
       }
@@ -142,17 +130,15 @@ const getAttendance = async (req, res) => {
     } else if (batchId) {
       query.batchId = batchId;
     }
-    
+
     if (studentId) {
       query.studentId = studentId;
     }
-    
+
     if (date) {
-      const searchDate = new Date(date);
-      searchDate.setHours(0, 0, 0, 0);
+      const searchDate = toUTCMidnight(date);
       const nextDay = new Date(searchDate);
-      nextDay.setDate(nextDay.getDate() + 1);
-      
+      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
       query.date = { $gte: searchDate, $lt: nextDay };
     }
 
@@ -178,7 +164,7 @@ const getAttendanceByStudent = async (req, res) => {
       const myBatches = await Batch.find({ teacherId: req.user.id }).select('_id');
       query.batchId = { $in: myBatches.map(b => b._id) };
     }
-    
+
     const records = await Attendance.find(query)
       .populate('batchId', 'name timing');
 
@@ -196,7 +182,7 @@ const updateAttendance = async (req, res) => {
     const { status } = req.body;
 
     if (!['present', 'absent', 'late'].includes(status)) {
-        return res.status(400).json({ message: 'Status must be present, absent, or late' });
+      return res.status(400).json({ message: 'Status must be present, absent, or late' });
     }
 
     const attendance = await Attendance.findById(req.params.id).populate('batchId');
@@ -205,11 +191,8 @@ const updateAttendance = async (req, res) => {
       return res.status(404).json({ message: 'Attendance record not found' });
     }
 
-    if (req.user.role !== 'admin') {
-      const teacherId = attendance.batchId?.teacherId;
-      if (!teacherId || teacherId.toString() !== req.user.id) {
-        return res.status(403).json({ message: 'Not authorized to update this record' });
-      }
+    if (!canAccessBatch(req.user, attendance.batchId || {})) {
+      return res.status(403).json({ message: 'Not authorized to update this record' });
     }
 
     attendance.status = status;
@@ -232,11 +215,8 @@ const deleteAttendance = async (req, res) => {
       return res.status(404).json({ message: 'Attendance record not found' });
     }
 
-    if (req.user.role !== 'admin') {
-      const teacherId = attendance.batchId?.teacherId;
-      if (!teacherId || teacherId.toString() !== req.user.id) {
-        return res.status(403).json({ message: 'Not authorized to delete this record' });
-      }
+    if (!canAccessBatch(req.user, attendance.batchId || {})) {
+      return res.status(403).json({ message: 'Not authorized to delete this record' });
     }
 
     await Attendance.findByIdAndDelete(req.params.id);

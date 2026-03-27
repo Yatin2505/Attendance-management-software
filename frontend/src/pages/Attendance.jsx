@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getBatches } from '../services/batchService';
-import { getAttendance, markAttendance, updateAttendance, markAllPresent } from '../services/attendanceService';
+import { getBatches, getBatchById } from '../services/batchService';
+import { getAttendance, markAttendance, markAllPresent } from '../services/attendanceService';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, Users, CheckCircle, XCircle, Clock, Save, CheckSquare, Inbox, GraduationCap } from 'lucide-react';
@@ -49,35 +49,34 @@ const Attendance = () => {
   const loadBatchData = async (batchId, selectedDate) => {
     try {
       setLoadingData(true);
-      
-      const batchObj = batches.find(b => b._id === batchId);
-      if (!batchObj) return;
 
+      // Fetch batch with fully populated student objects
+      const batchObj = await getBatchById(batchId);
       const batchStudents = batchObj.students || [];
       setStudents(batchStudents);
 
-      // Fetch existing records for this date & batch
+      // Fetch existing attendance records for this date & batch
       const records = await getAttendance(selectedDate, batchId, '');
-      
+
       const recordMap = {};
       const statusMap = {};
 
       records.forEach(record => {
-        const sid = record.studentId._id || record.studentId;
+        const sid = typeof record.studentId === 'object' ? record.studentId._id : record.studentId;
         recordMap[sid] = record;
         statusMap[sid] = record.status;
       });
 
-      // For students without a record, default to 'present'
+      // For students without a record yet, default to 'present'
       batchStudents.forEach(student => {
-        if (!statusMap[student._id]) {
-          statusMap[student._id] = 'present'; 
+        const sid = student._id || student;
+        if (!statusMap[sid]) {
+          statusMap[sid] = 'present';
         }
       });
 
       setExistingRecords(recordMap);
       setLocalStatuses(statusMap);
-
     } catch (error) {
       toast.error('Failed to load attendance data');
     } finally {
@@ -112,42 +111,35 @@ const Attendance = () => {
     let errorCount = 0;
 
     try {
+      // Always use markAttendance (upsert) — backend handles create OR update
       const promises = students.map(async (student) => {
-        const sid = student._id;
+        const sid = student._id || student;
         const currentStatus = localStatuses[sid];
-        const existingRecord = existingRecords[sid];
+        if (!currentStatus) return;
 
         try {
-          if (existingRecord) {
-            if (existingRecord.status !== currentStatus) {
-              await updateAttendance(existingRecord._id, currentStatus);
-              successCount++;
-            }
-          } else {
-            await markAttendance({
-              studentId: sid,
-              batchId: selectedBatchId,
-              date: date,
-              status: currentStatus
-            });
-            successCount++;
-          }
+          await markAttendance({
+            studentId: sid,
+            batchId: selectedBatchId,
+            date: date,
+            status: currentStatus
+          });
+          successCount++;
         } catch (err) {
           errorCount++;
-          console.error(err);
+          console.error('Failed to save for student', sid, err?.response?.data);
         }
       });
 
       await Promise.all(promises);
 
       if (errorCount > 0) {
-        toast.error(`Saved with ${errorCount} errors`);
-      } else if (successCount > 0) {
-        toast.success(`Successfully saved attendance`);
+        toast.error(`Saved with ${errorCount} error(s). Check console for details.`);
       } else {
-        toast('No changes detected', { icon: 'ℹ️' });
+        toast.success(`✅ Attendance saved for ${successCount} students!`);
       }
 
+      // Reload to confirm server state
       await loadBatchData(selectedBatchId, date);
     } catch (error) {
       toast.error('A critical error occurred while saving.');
