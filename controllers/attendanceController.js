@@ -17,8 +17,10 @@ const markAttendance = async (req, res) => {
     const batch = await Batch.findById(batchId);
     if (!batch) return res.status(404).json({ message: 'Batch not found' });
     
-    if (req.user.role !== 'admin' && batch.teacherId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to mark attendance for this batch' });
+    if (req.user.role !== 'admin') {
+      if (!batch.teacherId || batch.teacherId.toString() !== req.user.id) {
+        return res.status(403).json({ message: 'Not authorized to mark attendance for this batch' });
+      }
     }
 
     if (!['present', 'absent', 'late'].includes(status)) {
@@ -74,8 +76,10 @@ const markAllPresent = async (req, res) => {
       return res.status(404).json({ message: 'Batch not found' });
     }
     
-    if (req.user.role !== 'admin' && batch.teacherId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to mark attendance for this batch' });
+    if (req.user.role !== 'admin') {
+      if (!batch.teacherId || batch.teacherId.toString() !== req.user.id) {
+        return res.status(403).json({ message: 'Not authorized to mark attendance for this batch' });
+      }
     }
 
     const attendanceDate = new Date(date);
@@ -201,8 +205,11 @@ const updateAttendance = async (req, res) => {
       return res.status(404).json({ message: 'Attendance record not found' });
     }
 
-    if (req.user.role !== 'admin' && attendance.batchId.teacherId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to update this record' });
+    if (req.user.role !== 'admin') {
+      const teacherId = attendance.batchId?.teacherId;
+      if (!teacherId || teacherId.toString() !== req.user.id) {
+        return res.status(403).json({ message: 'Not authorized to update this record' });
+      }
     }
 
     attendance.status = status;
@@ -225,8 +232,11 @@ const deleteAttendance = async (req, res) => {
       return res.status(404).json({ message: 'Attendance record not found' });
     }
 
-    if (req.user.role !== 'admin' && attendance.batchId.teacherId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to delete this record' });
+    if (req.user.role !== 'admin') {
+      const teacherId = attendance.batchId?.teacherId;
+      if (!teacherId || teacherId.toString() !== req.user.id) {
+        return res.status(403).json({ message: 'Not authorized to delete this record' });
+      }
     }
 
     await Attendance.findByIdAndDelete(req.params.id);
