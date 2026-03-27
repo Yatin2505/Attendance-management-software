@@ -5,12 +5,15 @@ const {
   getStudents,
   getStudentById,
   updateStudent,
-  deleteStudent
+  deleteStudent,
+  importStudents
 } = require('../controllers/studentController');
 const { protect } = require('../middleware/authMiddleware');
 
 // Protect all routes
 router.use(protect);
+
+router.post('/import', importStudents);
 
 router.route('/')
   .get(getStudents)

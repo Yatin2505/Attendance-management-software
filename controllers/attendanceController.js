@@ -14,6 +14,13 @@ const markAttendance = async (req, res) => {
       return res.status(400).json({ message: 'Please provide studentId, batchId, date, and status' });
     }
 
+    const batch = await Batch.findById(batchId);
+    if (!batch) return res.status(404).json({ message: 'Batch not found' });
+    
+    if (req.user.role !== 'admin' && batch.teacherId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to mark attendance for this batch' });
+    }
+
     if (!['present', 'absent', 'late'].includes(status)) {
         return res.status(400).json({ message: 'Status must be present, absent, or late' });
     }
@@ -66,6 +73,10 @@ const markAllPresent = async (req, res) => {
     if (!batch) {
       return res.status(404).json({ message: 'Batch not found' });
     }
+    
+    if (req.user.role !== 'admin' && batch.teacherId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to mark attendance for this batch' });
+    }
 
     const attendanceDate = new Date(date);
     attendanceDate.setHours(0, 0, 0, 0);
@@ -116,7 +127,15 @@ const getAttendance = async (req, res) => {
     
     let query = {};
     
-    if (batchId) {
+    // Teacher scope isolation
+    if (req.user.role === 'teacher') {
+      const myBatches = await Batch.find({ teacherId: req.user.id }).select('_id');
+      const myBatchIds = myBatches.map(b => b._id.toString());
+      if (batchId && !myBatchIds.includes(batchId)) {
+        return res.status(403).json({ message: 'Not authorized to view this batch' });
+      }
+      query.batchId = { $in: batchId ? [batchId] : myBatchIds };
+    } else if (batchId) {
       query.batchId = batchId;
     }
     
@@ -149,8 +168,14 @@ const getAttendance = async (req, res) => {
 const getAttendanceByStudent = async (req, res) => {
   try {
     const studentId = req.params.id;
+    let query = { studentId };
+
+    if (req.user.role === 'teacher') {
+      const myBatches = await Batch.find({ teacherId: req.user.id }).select('_id');
+      query.batchId = { $in: myBatches.map(b => b._id) };
+    }
     
-    const records = await Attendance.find({ studentId })
+    const records = await Attendance.find(query)
       .populate('batchId', 'name timing');
 
     res.status(200).json(records);
@@ -170,10 +195,14 @@ const updateAttendance = async (req, res) => {
         return res.status(400).json({ message: 'Status must be present, absent, or late' });
     }
 
-    const attendance = await Attendance.findById(req.params.id);
+    const attendance = await Attendance.findById(req.params.id).populate('batchId');
 
     if (!attendance) {
       return res.status(404).json({ message: 'Attendance record not found' });
+    }
+
+    if (req.user.role !== 'admin' && attendance.batchId.teacherId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to update this record' });
     }
 
     attendance.status = status;
@@ -190,10 +219,14 @@ const updateAttendance = async (req, res) => {
 // @access  Private
 const deleteAttendance = async (req, res) => {
   try {
-    const attendance = await Attendance.findById(req.params.id);
+    const attendance = await Attendance.findById(req.params.id).populate('batchId');
 
     if (!attendance) {
       return res.status(404).json({ message: 'Attendance record not found' });
+    }
+
+    if (req.user.role !== 'admin' && attendance.batchId.teacherId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to delete this record' });
     }
 
     await Attendance.findByIdAndDelete(req.params.id);

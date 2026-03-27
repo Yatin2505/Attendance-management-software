@@ -42,8 +42,18 @@ const getStudents = async (req, res) => {
   try {
     const { batchId, name } = req.query;
     
-    // Build query object
     let query = {};
+    if (req.user.role === 'teacher') {
+      const teacherBatches = await Batch.find({ teacherId: req.user.id }).select('_id');
+      const batchIds = teacherBatches.map(b => b._id);
+      
+      if (batchId && !batchIds.some(id => id.toString() === batchId)) {
+        return res.status(403).json({ message: 'Not authorized for this batch' });
+      }
+      query.batches = { $in: batchId ? [batchId] : batchIds };
+    } else if (batchId) {
+      query.batches = { $in: [batchId] };
+    }
     if (batchId) {
       query.batches = { $in: [batchId] };
     }
@@ -158,10 +168,68 @@ const deleteStudent = async (req, res) => {
   }
 };
 
+// @desc    Import students from Excel/JSON array
+// @route   POST /api/students/import
+// @access  Private/Admin
+const importStudents = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only admins can mass-import students' });
+    }
+
+    const studentsToImport = req.body.students; // expects array of { name, rollNumber, batchId? }
+    if (!studentsToImport || !Array.isArray(studentsToImport)) {
+      return res.status(400).json({ message: 'Invalid payload, expected array of students' });
+    }
+
+    // Filter duplicates against DB first
+    const existingRollNumbers = await Student.find({
+      rollNumber: { $in: studentsToImport.map(s => s.rollNumber).filter(Boolean) }
+    }).select('rollNumber');
+    
+    const existingSet = new Set(existingRollNumbers.map(s => s.rollNumber));
+    
+    const validStudents = studentsToImport
+      .filter(s => s.name && s.rollNumber && !existingSet.has(s.rollNumber))
+      .map(s => ({
+        name: s.name.trim(),
+        rollNumber: String(s.rollNumber).trim(),
+        batches: s.batchId ? [s.batchId] : []
+      }));
+
+    if (validStudents.length === 0) {
+      return res.status(400).json({ message: 'No valid/new students to import' });
+    }
+
+    // Insert many
+    const inserted = await Student.insertMany(validStudents);
+
+    // Propagate many-to-many relationship tracking on batches
+    const batchUpdates = {};
+    for (const student of inserted) {
+      if (student.batches && student.batches.length > 0) {
+        student.batches.forEach(bId => {
+          if (!batchUpdates[bId]) batchUpdates[bId] = [];
+          batchUpdates[bId].push(student._id);
+        });
+      }
+    }
+
+    for (const [bId, studentIds] of Object.entries(batchUpdates)) {
+      await Batch.findByIdAndUpdate(bId, { $addToSet: { students: { $each: studentIds } } });
+    }
+
+    res.status(201).json({ message: `Successfully imported ${inserted.length} students` });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createStudent,
   getStudents,
   getStudentById,
   updateStudent,
-  deleteStudent
+  deleteStudent,
+  importStudents
 };

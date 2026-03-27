@@ -54,6 +54,7 @@ app.get('/health', (req, res) => {
 // Routes
 app.use('/api', testRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/students', studentRoutes);
 app.use('/api/batches', batchRoutes);
 app.use('/api/attendance', attendanceRoutes);

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getBatches, createBatch, updateBatch, deleteBatch, assignStudentToBatch, removeStudentFromBatch } from '../services/batchService';
 import { getStudents } from '../services/studentService';
+import { getCurrentUser } from '../services/authService';
+import { userService } from '../services/userService';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plus, Edit2, Trash2, ChevronDown, Clock, Users, X, UserMinus, UserPlus, FolderOpen } from 'lucide-react';
@@ -16,10 +18,12 @@ const Batches = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentBatch, setCurrentBatch] = useState(null);
-  const [formData, setFormData] = useState({ name: '', timing: '' });
+  const [formData, setFormData] = useState({ name: '', timing: '', teacherId: '' });
   const [processing, setProcessing] = useState(false);
 
   const [selectedStudentToAdd, setSelectedStudentToAdd] = useState('');
+  const [teachers, setTeachers] = useState([]);
+  const currentUser = getCurrentUser();
 
   useEffect(() => {
     fetchData();
@@ -34,6 +38,11 @@ const Batches = () => {
       ]);
       setBatches(batchesData);
       setAllStudents(studentsData);
+      
+      if (currentUser?.role === 'admin') {
+        const teachersData = await userService.getTeachers();
+        setTeachers(teachersData);
+      }
     } catch (error) {
       toast.error('Failed to load batches');
     } finally {
@@ -54,18 +63,18 @@ const Batches = () => {
     if (batch) {
       setIsEditing(true);
       setCurrentBatch(batch);
-      setFormData({ name: batch.name, timing: batch.timing });
+      setFormData({ name: batch.name, timing: batch.timing, teacherId: batch.teacherId?._id || batch.teacherId || '' });
     } else {
       setIsEditing(false);
       setCurrentBatch(null);
-      setFormData({ name: '', timing: '' });
+      setFormData({ name: '', timing: '', teacherId: '' });
     }
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setFormData({ name: '', timing: '' });
+    setFormData({ name: '', timing: '', teacherId: '' });
   };
 
   const handleSubmit = async (e) => {
@@ -400,6 +409,23 @@ const Batches = () => {
                     disabled={processing}
                   />
                 </div>
+                
+                {currentUser?.role === 'admin' && (
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Assign Teacher</label>
+                    <select
+                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition-all text-slate-800 dark:text-white font-medium"
+                      value={formData.teacherId}
+                      onChange={(e) => setFormData({...formData, teacherId: e.target.value})}
+                      disabled={processing}
+                    >
+                      <option value="">Select a Teacher (Required)</option>
+                      {teachers.map(t => (
+                        <option key={t._id} value={t._id}>{t.name} ({t.email})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 
                 <div className="pt-6 mt-6 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 rounded-b-3xl">
                   <button 

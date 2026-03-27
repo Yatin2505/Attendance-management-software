@@ -34,4 +34,7 @@ const attendanceSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Add compound index to prevent duplicate attendance marked for the same student, same batch, on the exact same date
+attendanceSchema.index({ studentId: 1, batchId: 1, date: 1 }, { unique: true });
+
 module.exports = mongoose.model('Attendance', attendanceSchema);

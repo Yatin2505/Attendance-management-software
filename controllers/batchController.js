@@ -12,8 +12,11 @@ const createBatch = async (req, res) => {
     if (!name) {
       return res.status(400).json({ message: 'Please provide a batch name' });
     }
-    if (req.user.role !== 'admin' && userId !== teacherId) {
-      return res.status(403).json({ message: 'Only admins or assigned teachers can create batches' });
+    if (req.user.role !== 'admin') {
+      // Teachers can only create batches for themselves
+      if (teacherId && teacherId !== userId) {
+        return res.status(403).json({ message: 'Teachers can only assign themselves to new batches' });
+      }
     }
 
     const batch = await Batch.create({
@@ -74,12 +77,17 @@ const updateBatch = async (req, res) => {
 
     const batch = await Batch.findById(req.params.id);
 
-    if (!batch) {
-      return res.status(404).json({ message: 'Batch not found' });
+    if (req.user.role !== 'admin' && batch.teacherId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to update this batch' });
     }
 
     batch.name = name || batch.name;
     batch.timing = timing || batch.timing;
+    
+    // Only admins can reassign the teacher
+    if (req.user.role === 'admin' && req.body.teacherId) {
+      batch.teacherId = req.body.teacherId;
+    }
 
     const updatedBatch = await batch.save();
 
@@ -98,6 +106,10 @@ const deleteBatch = async (req, res) => {
 
     if (!batch) {
       return res.status(404).json({ message: 'Batch not found' });
+    }
+
+    if (req.user.role !== 'admin' && batch.teacherId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to delete this batch' });
     }
 
     // Remove reference from all students in this batch
@@ -129,6 +141,10 @@ const assignStudentToBatch = async (req, res) => {
     const batch = await Batch.findById(batchId);
     if (!batch) {
       return res.status(404).json({ message: 'Batch not found' });
+    }
+
+    if (req.user.role !== 'admin' && batch.teacherId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to modify this batch' });
     }
 
     const student = await Student.findById(studentId);
@@ -172,6 +188,10 @@ const removeStudentFromBatch = async (req, res) => {
     const batch = await Batch.findById(batchId);
     if (!batch) {
       return res.status(404).json({ message: 'Batch not found' });
+    }
+
+    if (req.user.role !== 'admin' && batch.teacherId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to modify this batch' });
     }
 
     const student = await Student.findById(studentId);

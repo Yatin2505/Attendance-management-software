@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getStudents, createStudent, updateStudent, deleteStudent } from '../services/studentService';
+import { getStudents, createStudent, updateStudent, deleteStudent, importStudents } from '../services/studentService';
 import { getBatches } from '../services/batchService';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Edit2, Trash2, Filter, Users, X, GraduationCap, CheckSquare, Square, Inbox } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Filter, Users, X, GraduationCap, CheckSquare, Square, Inbox, UploadCloud } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { getCurrentUser } from '../services/authService';
 
 const Students = () => {
   const [students, setStudents] = useState([]);
@@ -20,6 +22,43 @@ const Students = () => {
   const [currentStudent, setCurrentStudent] = useState(null);
   const [formData, setFormData] = useState({ name: '', rollNumber: '', batches: [] });
   const [processing, setProcessing] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const currentUser = getCurrentUser();
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setImporting(true);
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const wsname = workbook.SheetNames[0];
+      const ws = workbook.Sheets[wsname];
+      const json = XLSX.utils.sheet_to_json(ws);
+      
+      const formattedStudents = json.map(row => ({
+        name: String(row.Name || row.name || ''),
+        rollNumber: String(row['Roll Number'] || row.RollNumber || row.rollNumber || row.roll || ''),
+        batchId: filterBatch || null 
+      }));
+
+      if (!formattedStudents[0]?.name || !formattedStudents[0]?.rollNumber) {
+        toast.error("Invalid format. Ensure 'Name' and 'Roll Number' columns exist.");
+        e.target.value = null;
+        return;
+      }
+
+      const res = await importStudents(formattedStudents);
+      toast.success(res.message || 'Students imported successfully');
+      fetchData();
+    } catch (error) {
+       toast.error(error.response?.data?.message || 'Failed to parse Excel file. Ensure valid headers.');
+    } finally {
+      setImporting(false);
+      e.target.value = null;
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -158,6 +197,27 @@ const Students = () => {
               </svg>
             </div>
           </div>
+
+          {currentUser?.role === 'admin' && (
+            <div className="relative group/btn cursor-pointer">
+              <input
+                type="file"
+                accept=".xlsx, .xls, .csv"
+                onChange={handleFileUpload}
+                title=""
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                disabled={importing}
+              />
+              <button 
+                type="button"
+                className={`flex items-center justify-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-2xl shadow-sm group-hover/btn:border-primary-500/50 group-hover/btn:shadow-md transition-all w-full sm:w-auto ${importing ? 'opacity-50 cursor-wait' : ''}`}
+                disabled={importing}
+              >
+                {importing ? <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div> : <UploadCloud className="w-5 h-5 text-primary-500" />}
+                Import Excel
+              </button>
+            </div>
+          )}
 
           <button 
             onClick={() => handleOpenModal()}
