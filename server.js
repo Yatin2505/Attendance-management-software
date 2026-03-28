@@ -17,18 +17,22 @@ const app = express();
 connectDB();
 
 // Middleware
-const ALLOWED_ORIGINS = [
-  "https://attendance-management-software-nine.vercel.app",
-  "http://localhost:5173",   // local dev
-  "http://localhost:3000"
+// Allow main production, all Vercel preview deployments, and local dev
+const ALLOWED_ORIGIN_PATTERNS = [
+  /^https:\/\/attendance-management-software[a-z0-9-]*\.vercel\.app$/,
+  /^https:\/\/attendance-management-software[a-z0-9-]*-yatin2505s-projects\.vercel\.app$/,
+  /^http:\/\/localhost:\d+$/,
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (e.g. mobile apps, curl)
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+    // Allow requests with no origin (mobile apps, curl, Render health checks)
+    if (!origin) return callback(null, true);
+    const allowed = ALLOWED_ORIGIN_PATTERNS.some(pattern => pattern.test(origin));
+    if (allowed) {
       callback(null, true);
     } else {
+      console.warn(`CORS blocked: ${origin}`);
       callback(new Error(`CORS: origin ${origin} not allowed`));
     }
   },
