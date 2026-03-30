@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import DarkToggle from '../components/DarkToggle';
 
 const MainLayout = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -120,9 +119,6 @@ const MainLayout = () => {
           </div>
           
           <div className="flex items-center space-x-4">
-            <div className="bg-white/50 dark:bg-slate-800/50 backdrop-blur-md p-1.5 rounded-2xl border border-white/20 dark:border-white/5 shadow-sm">
-              <DarkToggle />
-            </div>
             
             <div className="flex items-center gap-3 pl-2 border-l border-slate-200 dark:border-slate-800">
               <div className="hidden sm:flex flex-col text-right">
