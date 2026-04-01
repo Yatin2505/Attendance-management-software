@@ -48,8 +48,10 @@ const getDashboardStats = async (req, res) => {
     const todayPresent = todayRecords.filter(r => r.status === 'present').length;
     const todayAbsent  = todayRecords.filter(r => r.status === 'absent').length;
     const todayLate    = todayRecords.filter(r => r.status === 'late').length;
+    const todayLeave   = todayRecords.filter(r => r.status === 'leave').length;
     const todayTotal   = todayRecords.length;
-    const todayPercentage = todayTotal > 0 ? Math.round(((todayPresent + todayLate) / todayTotal) * 100) : 0;
+    const todayDenom   = todayTotal - todayLeave;
+    const todayPercentage = todayDenom > 0 ? Math.round(((todayPresent + todayLate) / todayDenom) * 100) : 0;
 
     // -- Overall attendance percentage (all time) --
     const overallAgg = await Attendance.aggregate([
@@ -57,13 +59,16 @@ const getDashboardStats = async (req, res) => {
         $group: {
           _id: null,
           total: { $sum: 1 },
-          present: { $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] } }
+          present: { $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] } },
+          leave: { $sum: { $cond: [{ $eq: ['$status', 'leave'] }, 1, 0] } }
         }
       }
     ]);
     const overallTotal   = overallAgg[0]?.total ?? 0;
     const overallPresent = overallAgg[0]?.present ?? 0;
-    const overallPercentage = overallTotal > 0 ? Math.round((overallPresent / overallTotal) * 100) : 0;
+    const overallLeave   = overallAgg[0]?.leave ?? 0;
+    const overallDenom   = overallTotal - overallLeave;
+    const overallPercentage = overallDenom > 0 ? Math.round((overallPresent / overallDenom) * 100) : 0;
 
     // -- Monthly attendance trend (last 30 days, grouped by day) --
     const thirtyDaysAgo = new Date();
@@ -76,7 +81,8 @@ const getDashboardStats = async (req, res) => {
         $group: {
           _id: { $dateToString: { format: '%Y-%m-%d', date: '$date' } },
           total:   { $sum: 1 },
-          present: { $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] } }
+          present: { $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] } },
+          leave:   { $sum: { $cond: [{ $eq: ['$status', 'leave'] }, 1, 0] } }
         }
       },
       { $sort: { _id: 1 } },
@@ -85,10 +91,11 @@ const getDashboardStats = async (req, res) => {
           date: '$_id',
           total: 1,
           present: 1,
+          leave: 1,
           percentage: {
             $cond: [
-              { $gt: ['$total', 0] },
-              { $round: [{ $multiply: [{ $divide: ['$present', '$total'] }, 100] }, 0] },
+              { $gt: [{ $subtract: ['$total', '$leave'] }, 0] },
+              { $round: [{ $multiply: [{ $divide: ['$present', { $subtract: ['$total', '$leave'] }] }, 100] }, 0] },
               0
             ]
           },
@@ -103,7 +110,8 @@ const getDashboardStats = async (req, res) => {
         $group: {
           _id: '$batchId',
           total:   { $sum: 1 },
-          present: { $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] } }
+          present: { $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] } },
+          leave:   { $sum: { $cond: [{ $eq: ['$status', 'leave'] }, 1, 0] } }
         }
       },
       {
@@ -120,10 +128,11 @@ const getDashboardStats = async (req, res) => {
           batchName: { $ifNull: ['$batchInfo.name', 'Unknown'] },
           total: 1,
           present: 1,
+          leave: 1,
           percentage: {
             $cond: [
-              { $gt: ['$total', 0] },
-              { $round: [{ $multiply: [{ $divide: ['$present', '$total'] }, 100] }, 0] },
+              { $gt: [{ $subtract: ['$total', '$leave'] }, 0] },
+              { $round: [{ $multiply: [{ $divide: ['$present', { $subtract: ['$total', '$leave'] }] }, 100] }, 0] },
               0
             ]
           }
@@ -152,6 +161,7 @@ const getDashboardStats = async (req, res) => {
         present: todayPresent,
         absent:  todayAbsent,
         late:    todayLate,
+        leave:   todayLeave,
         total:   todayTotal,
         percentage: todayPercentage
       },

@@ -26,8 +26,8 @@ const markAttendance = async (req, res) => {
       return res.status(400).json({ message: 'Please provide studentId, batchId, date, and status' });
     }
 
-    if (!['present', 'absent', 'late'].includes(status)) {
-      return res.status(400).json({ message: 'Status must be present, absent, or late' });
+    if (!['present', 'absent', 'late', 'leave'].includes(status)) {
+      return res.status(400).json({ message: 'Status must be present, absent, late, or leave' });
     }
 
     const batch = await Batch.findById(batchId);
@@ -46,6 +46,7 @@ const markAttendance = async (req, res) => {
         $set: {
           status,
           teacherId: req.user.id,
+          leaveType: req.body.leaveType || undefined,
           notes: notes || ''
         }
       },
@@ -117,7 +118,7 @@ const markAttendanceBulk = async (req, res) => {
       return res.status(400).json({ message: 'Please provide batchId, date, and a non-empty records array' });
     }
 
-    const validStatuses = ['present', 'absent', 'late'];
+    const validStatuses = ['present', 'absent', 'late', 'leave'];
     for (const r of records) {
       if (!r.studentId || !validStatuses.includes(r.status)) {
         return res.status(400).json({ message: `Invalid record: each entry needs studentId and a valid status` });
@@ -133,13 +134,14 @@ const markAttendanceBulk = async (req, res) => {
 
     const attendanceDate = toUTCMidnight(date);
 
-    const bulkOps = records.map(({ studentId, status, notes }) => ({
+    const bulkOps = records.map(({ studentId, status, notes, leaveType }) => ({
       updateOne: {
         filter: { studentId, batchId, date: attendanceDate },
         update: {
           $set: {
             status,
             teacherId: req.user.id,
+            leaveType: leaveType || undefined,
             notes: notes || ''
           }
         },
@@ -308,7 +310,10 @@ const getAttendanceTrends = async (req, res) => {
           _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
           total: { $sum: 1 },
           present: {
-            $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] }
+            $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] }
+          },
+          leave: {
+            $sum: { $cond: [{ $eq: ['$status', 'leave'] }, 1, 0] }
           }
         }
       },

@@ -23,8 +23,18 @@ const attendanceSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['present', 'absent', 'late'],
+    enum: ['present', 'absent', 'late', 'leave'],
     required: true
+  },
+  leaveType: {
+    type: String,
+    enum: ['Sick Leave', 'Personal Leave', 'Holiday', 'Other'],
+    required: false
+  },
+  leaveRequestId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'LeaveRequest',
+    required: false
   },
   notes: {
     type: String,

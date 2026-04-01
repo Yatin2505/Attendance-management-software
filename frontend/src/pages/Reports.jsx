@@ -25,6 +25,7 @@ const GREEN = '#10b981';
 const RED   = '#f43f5e';
 const AMBER = '#f59e0b';
 const INDIGO= '#6366f1';
+const VIOLET= '#8b5cf6';
 
 // ─── Percentage badge ─────────────────────────────────────────────────────────
 const PctBadge = ({ pct }) => {
@@ -224,17 +225,22 @@ const Reports = () => {
         total:   s.totalDays,
         present: s.presentDays,
         absent:  s.absentDays,
+        leave:   s.leaveDays,
         pct:     s.percentage,
       };
     }
     const rows = tableRows;
     const total   = rows.reduce((a, r) => a + (r.totalDays   ?? 0), 0);
     const present = rows.reduce((a, r) => a + (r.presentDays ?? 0), 0);
+    const leave   = rows.reduce((a, r) => a + (r.leaveDays   ?? 0), 0);
+    const absent  = total - present - leave;
+    const denom   = total - leave;
     return {
       total,
       present,
-      absent: total - present,
-      pct:    total > 0 ? Math.round((present / total) * 100) : 0,
+      absent,
+      leave,
+      pct:    denom > 0 ? Math.round((present / denom) * 100) : 0,
     };
   }, [reportData, reportType, tableRows]);
 
@@ -246,20 +252,21 @@ const Reports = () => {
     if (reportType === 'student') {
       const s = reportData.stats;
       const st = reportData.student;
-      headers = ['Name', 'Roll Number', 'Total Days', 'Present Days', 'Absent Days', 'Attendance %'];
+      headers = ['Name', 'Roll Number', 'Total Days', 'Present Days', 'Absent Days', 'Leave Days', 'Attendance %'];
       rows = reportData.batchReports.map(r => [
-        st?.name, st?.rollNumber, r.totalDays, r.presentDays, r.absentDays, r.percentage
+        st?.name, st?.rollNumber, r.totalDays, r.presentDays, r.absentDays, r.leaveDays, r.percentage
       ]);
-      if (!rows.length) rows = [[st?.name, st?.rollNumber, s.totalDays, s.presentDays, s.absentDays, s.percentage]];
+      if (!rows.length) rows = [[st?.name, st?.rollNumber, s.totalDays, s.presentDays, s.absentDays, s.leaveDays, s.percentage]];
       filename = `student_report_${st?.rollNumber ?? 'export'}`;
     } else {
-      headers = ['Name', 'Roll Number', 'Total Days', 'Present Days', 'Absent Days', 'Attendance %'];
+      headers = ['Name', 'Roll Number', 'Total Days', 'Present Days', 'Absent Days', 'Leave Days', 'Attendance %'];
       rows = tableRows.map(r => [
         r.name ?? r.batchName ?? '',
         r.rollNumber ?? '',
         r.totalDays ?? 0,
         r.presentDays ?? 0,
-        (r.totalDays ?? 0) - (r.presentDays ?? 0),
+        (r.totalDays ?? 0) - (r.presentDays ?? 0) - (r.leaveDays ?? 0),
+        r.leaveDays ?? 0,
         r.percentage ?? 0,
       ]);
       filename = reportType === 'batch'
@@ -293,6 +300,7 @@ const Reports = () => {
     return [
       { name: 'Present', value: stats.present },
       { name: 'Absent',  value: stats.absent  },
+      { name: 'Leave',   value: stats.leave   },
     ];
   }, [stats]);
 
@@ -530,6 +538,7 @@ const Reports = () => {
                 { label: 'Total Sessions', value: stats.total,   color: 'text-slate-800 dark:text-white'   },
                 { label: 'Present',        value: stats.present, color: 'text-emerald-600 dark:text-emerald-400' },
                 { label: 'Absent',         value: stats.absent,  color: 'text-rose-600 dark:text-rose-400'  },
+                { label: 'Leave',          value: stats.leave,   color: 'text-violet-600 dark:text-violet-400' },
                 { label: 'Attendance %',   value: `${stats.pct}%`,
                   color: stats.pct >= 75 ? 'text-emerald-600 dark:text-emerald-400'
                        : stats.pct >= 60 ? 'text-amber-600 dark:text-amber-400'
@@ -595,6 +604,7 @@ const Reports = () => {
                           >
                             <Cell fill={GREEN} />
                             <Cell fill={RED}   />
+                            <Cell fill={VIOLET}/>
                           </Pie>
                           <Tooltip content={<ChartTooltip />} />
                           <Legend
@@ -624,7 +634,7 @@ const Reports = () => {
                     <div key={i} className="flex-1 min-w-[160px] bg-slate-50 dark:bg-slate-800/60 rounded-xl p-4 border border-slate-100 dark:border-slate-800">
                       <p className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate mb-1">{r.batchName}</p>
                       <p className="text-2xl font-display font-bold text-slate-900 dark:text-white">{r.percentage}%</p>
-                      <p className="text-xs text-slate-400 mt-1">{r.presentDays}/{r.totalDays} sessions</p>
+                      <p className="text-[10px] text-slate-400 mt-1">P:{r.presentDays} L:{r.leaveDays} T:{r.totalDays}</p>
                     </div>
                   ))}
                 </div>
@@ -674,6 +684,7 @@ const Reports = () => {
                         )}
                         <SortTh label="Total"          sortKey="totalDays"   sortState={sort} onSort={handleSort} className="text-center" />
                         <SortTh label="Present"        sortKey="presentDays" sortState={sort} onSort={handleSort} className="text-center" />
+                        <SortTh label="Leave"          sortKey="leaveDays"   sortState={sort} onSort={handleSort} className="text-center" />
                         <th className="py-3 px-4 text-xs font-bold uppercase tracking-wide text-slate-400 text-center">Absent</th>
                         <SortTh label="Attendance %"   sortKey="percentage"  sortState={sort} onSort={handleSort} className="text-center" />
                       </tr>
@@ -701,6 +712,7 @@ const Reports = () => {
                             )}
                             <td className="py-3 px-4 text-sm text-center text-slate-600 dark:text-slate-300 font-medium">{row.totalDays ?? 0}</td>
                             <td className="py-3 px-4 text-sm text-center font-bold text-emerald-600 dark:text-emerald-400">{row.presentDays ?? 0}</td>
+                            <td className="py-3 px-4 text-sm text-center font-bold text-violet-600 dark:text-violet-400">{row.leaveDays ?? 0}</td>
                             <td className="py-3 px-4 text-sm text-center font-bold text-rose-600 dark:text-rose-400">{absent}</td>
                             <td className="py-3 px-4 text-center">
                               <PctBadge pct={row.percentage ?? 0} />
@@ -719,6 +731,7 @@ const Reports = () => {
                           </td>
                           <td className="py-3 px-4 text-center text-slate-800 dark:text-white">{stats.total}</td>
                           <td className="py-3 px-4 text-center text-emerald-600 dark:text-emerald-400">{stats.present}</td>
+                          <td className="py-3 px-4 text-center text-violet-600 dark:text-violet-400">{stats.leave}</td>
                           <td className="py-3 px-4 text-center text-rose-600 dark:text-rose-400">{stats.absent}</td>
                           <td className="py-3 px-4 text-center"><PctBadge pct={stats.pct} /></td>
                         </tr>

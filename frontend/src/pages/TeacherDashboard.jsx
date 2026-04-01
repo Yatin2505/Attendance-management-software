@@ -26,6 +26,7 @@ const TeacherDashboard = () => {
     myBatches: 0,
     todayPresent: 0,
     todayAbsent: 0,
+    todayLeave: 0,
     todayPercentage: 0
   });
   
@@ -56,6 +57,7 @@ const TeacherDashboard = () => {
       // Estimate today's attendance for teacher's batches
       const todayDate = new Date().toISOString().split('T')[0];
       let presentToday = 0;
+      let leaveToday   = 0;
       let totalTodayLogs = 0;
 
       const thirtyDaysAgo = new Date();
@@ -69,7 +71,8 @@ const TeacherDashboard = () => {
            
            if (dayStr === todayDate) {
               totalTodayLogs += 1;
-              if (record.status === 'present') presentToday += 1;
+              if (record.status === 'present' || record.status === 'late') presentToday += 1;
+              if (record.status === 'leave') leaveToday += 1;
            }
 
            if (recDate >= thirtyDaysAgo) {
@@ -84,14 +87,16 @@ const TeacherDashboard = () => {
         });
       }
 
-      const absentToday = totalTodayLogs - presentToday;
-      const pct = totalTodayLogs > 0 ? Math.round((presentToday / totalTodayLogs) * 100) : 0;
+      const absentToday = totalTodayLogs - presentToday - leaveToday;
+      const denom = totalTodayLogs - leaveToday;
+      const pct = denom > 0 ? Math.round((presentToday / denom) * 100) : 0;
 
       setStats({
         totalStudents,
         myBatches: myBatchesData.length,
         todayPresent: presentToday,
         todayAbsent: absentToday,
+        todayLeave: leaveToday,
         todayPercentage: pct
       });
 
@@ -100,8 +105,15 @@ const TeacherDashboard = () => {
           const formatObj = new Date(dateStr);
           const displayDate = formatObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
           const dayStats = dateMap[dateStr];
-          const percentage = Math.round((dayStats.present / dayStats.total) * 100);
-          return { name: displayDate, percentage, present: dayStats.present, absent: dayStats.total - dayStats.present };
+          const denom = dayStats.total - dayStats.leave;
+          const percentage = denom > 0 ? Math.round((dayStats.present / denom) * 100) : 0;
+          return { 
+            name: displayDate, 
+            percentage, 
+            present: dayStats.present, 
+            absent: dayStats.total - dayStats.present - dayStats.leave,
+            leave: dayStats.leave
+          };
       });
 
       setChartData(chartTimeseries);

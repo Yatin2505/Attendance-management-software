@@ -25,12 +25,14 @@ const fmtShort = (dateStr) => {
 const statusColor = (status) => {
   if (status === 'present') return 'text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/10';
   if (status === 'absent')  return 'text-rose-600 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/10';
+  if (status === 'leave')   return 'text-violet-600 bg-violet-50 dark:text-violet-400 dark:bg-violet-500/10';
   return 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/10';
 };
 
 const statusIcon = (status) => {
   if (status === 'present') return <CheckCircle className="w-3.5 h-3.5" />;
   if (status === 'absent')  return <XCircle className="w-3.5 h-3.5" />;
+  if (status === 'leave')   return <Calendar className="w-3.5 h-3.5" />;
   return <Clock className="w-3.5 h-3.5" />;
 };
 
@@ -250,6 +252,13 @@ const Dashboard = () => {
           icon={XCircle}    iconBg="bg-rose-50 dark:bg-rose-500/10"
           iconColor="text-rose-600 dark:text-rose-400"
           delay={0.2}
+        />
+        <StatCard
+          label="Leave"     value={tod.leave}
+          sub="today"
+          icon={Calendar}   iconBg="bg-violet-50 dark:bg-violet-500/10"
+          iconColor="text-violet-600 dark:text-violet-400"
+          delay={0.24}
         />
       </div>
 

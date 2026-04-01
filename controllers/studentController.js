@@ -246,7 +246,8 @@ const getStudentProfile = async (req, res) => {
             total:   { $sum: 1 },
             present: { $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] } },
             absent:  { $sum: { $cond: [{ $eq:  ['$status', 'absent'] }, 1, 0] } },
-            late:    { $sum: { $cond: [{ $eq:  ['$status', 'late']   }, 1, 0] } }
+            late:    { $sum: { $cond: [{ $eq:  ['$status', 'late']   }, 1, 0] } },
+            leave:   { $sum: { $cond: [{ $eq:  ['$status', 'leave']  }, 1, 0] } }
           }
         },
         {
@@ -258,11 +259,11 @@ const getStudentProfile = async (req, res) => {
         {
           $project: {
             batchName: { $ifNull: ['$batchInfo.name', 'Unknown'] },
-            total: 1, present: 1, absent: 1, late: 1,
+            total: 1, present: 1, absent: 1, late: 1, leave: 1,
             percentage: {
               $cond: [
-                { $gt: ['$total', 0] },
-                { $round: [{ $multiply: [{ $divide: ['$present', '$total'] }, 100] }, 1] },
+                { $gt: [{ $subtract: ['$total', '$leave'] }, 0] },
+                { $round: [{ $multiply: [{ $divide: ['$present', { $subtract: ['$total', '$leave'] }] }, 100] }, 1] },
                 0
               ]
             }
@@ -289,11 +290,11 @@ const getStudentProfile = async (req, res) => {
         {
           $project: {
             year: '$_id.year', month: '$_id.month',
-            total: 1, present: 1,
+            total: 1, present: 1, leave: 1,
             percentage: {
               $cond: [
-                { $gt: ['$total', 0] },
-                { $round: [{ $multiply: [{ $divide: ['$present', '$total'] }, 100] }, 0] },
+                { $gt: [{ $subtract: ['$total', '$leave'] }, 0] },
+                { $round: [{ $multiply: [{ $divide: ['$present', { $subtract: ['$total', '$leave'] }] }, 100] }, 0] },
                 0
               ]
             },
@@ -318,8 +319,10 @@ const getStudentProfile = async (req, res) => {
     const totalPresent  = overallAgg.reduce((s, b) => s + b.present, 0);
     const totalAbsent   = overallAgg.reduce((s, b) => s + b.absent,  0);
     const totalLate     = overallAgg.reduce((s, b) => s + b.late,    0);
-    const overallPct    = totalSessions > 0
-      ? Math.round((totalPresent / totalSessions) * 100)
+    const totalLeave    = overallAgg.reduce((s, b) => s + b.leave,   0);
+    const denom         = totalSessions - totalLeave;
+    const overallPct    = denom > 0
+      ? Math.round((totalPresent / denom) * 100)
       : 0;
 
     const MONTHS = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -338,7 +341,7 @@ const getStudentProfile = async (req, res) => {
 
     res.status(200).json({
       student,
-      stats: { totalSessions, totalPresent, totalAbsent, totalLate, overallPct },
+      stats: { totalSessions, totalPresent, totalAbsent, totalLate, totalLeave, overallPct },
       batchBreakdown: overallAgg,
       monthly,
       history

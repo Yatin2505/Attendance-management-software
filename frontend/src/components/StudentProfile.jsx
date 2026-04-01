@@ -16,6 +16,7 @@ const GREEN  = '#10b981';
 const RED    = '#f43f5e';
 const AMBER  = '#f59e0b';
 const INDIGO = '#6366f1';
+const VIOLET = '#8b5cf6';
 
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', {
   day: 'numeric', month: 'short', year: 'numeric'
@@ -26,8 +27,14 @@ const StatusBadge = ({ status }) => {
     present: 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
     absent:  'bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-400',
     late:    'bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400',
+    leave:   'bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-400',
   };
-  const icon = { present: <CheckCircle className="w-3 h-3" />, absent: <XCircle className="w-3 h-3" />, late: <Clock className="w-3 h-3" /> };
+  const icon = { 
+    present: <CheckCircle className="w-3 h-3" />, 
+    absent: <XCircle className="w-3 h-3" />, 
+    late: <Clock className="w-3 h-3" />,
+    leave: <Calendar className="w-3 h-3" />
+  };
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold capitalize ${map[status] ?? map.absent}`}>
       {icon[status]} {status}
@@ -157,7 +164,7 @@ const StudentProfile = ({ studentId, onClose }) => {
                         { label: 'Sessions', value: data.stats.totalSessions, color: 'text-slate-900 dark:text-white' },
                         { label: 'Present',  value: data.stats.totalPresent,  color: 'text-emerald-600 dark:text-emerald-400' },
                         { label: 'Absent',   value: data.stats.totalAbsent,   color: 'text-rose-600 dark:text-rose-400'   },
-                        { label: 'Late',     value: data.stats.totalLate,     color: 'text-amber-600 dark:text-amber-400'  },
+                        { label: 'Leave',    value: data.stats.totalLeave || 0, color: 'text-violet-600 dark:text-violet-400' },
                       ].map(({ label, value, color }) => (
                         <div key={label}>
                           <p className={`text-xl font-display font-bold ${color}`}>{value}</p>
@@ -272,7 +279,7 @@ const StudentProfile = ({ studentId, onClose }) => {
                                 data={[
                                   { name: 'Present', value: data.stats.totalPresent },
                                   { name: 'Absent',  value: data.stats.totalAbsent  },
-                                  { name: 'Late',    value: data.stats.totalLate    },
+                                  { name: 'Leave',   value: data.stats.totalLeave || 0 },
                                 ].filter(d => d.value > 0)}
                                 cx="50%" cy="50%"
                                 innerRadius={36} outerRadius={56}
@@ -281,7 +288,7 @@ const StudentProfile = ({ studentId, onClose }) => {
                               >
                                 <Cell fill={GREEN}  />
                                 <Cell fill={RED}    />
-                                <Cell fill={AMBER}  />
+                                <Cell fill={VIOLET} />
                               </Pie>
                               <Tooltip content={<ChartTooltip />} />
                             </PieChart>
@@ -291,7 +298,7 @@ const StudentProfile = ({ studentId, onClose }) => {
                           {[
                             { label: 'Present', value: data.stats.totalPresent, color: 'bg-emerald-500' },
                             { label: 'Absent',  value: data.stats.totalAbsent,  color: 'bg-rose-500'    },
-                            { label: 'Late',    value: data.stats.totalLate,    color: 'bg-amber-500'   },
+                            { label: 'Leave',   value: data.stats.totalLeave || 0, color: 'bg-violet-500' },
                           ].map(({ label, value, color }) => (
                             <div key={label} className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
                               <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${color}`} />

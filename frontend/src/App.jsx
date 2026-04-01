@@ -13,6 +13,7 @@ import Teachers from './pages/Teachers';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
+import LeaveManagement from './pages/LeaveManagement';
 
 function App() {
   return (
@@ -44,6 +45,7 @@ function App() {
             <Route path="students" element={<Students />} />
             <Route path="batches"  element={<Batches />} />
             <Route path="attendance" element={<Attendance />} />
+            <Route path="leave"      element={<LeaveManagement />} />
             <Route path="profile"  element={<Profile />} />
 
             {/* Admin-only routes */}

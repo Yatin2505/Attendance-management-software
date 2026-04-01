@@ -10,8 +10,8 @@ import {
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const STATUS = { PRESENT: 'present', ABSENT: 'absent', LATE: 'late' };
-const FILTERS = ['all', 'present', 'absent', 'late'];
+const STATUS = { PRESENT: 'present', ABSENT: 'absent', LATE: 'late', LEAVE: 'leave' };
+const FILTERS = ['all', 'present', 'absent', 'late', 'leave'];
 
 // ─── StatusToggle (memoized for perf) ────────────────────────────────────────
 const StatusToggle = React.memo(({ studentId, status, onStatusChange, disabled }) => {
@@ -19,6 +19,7 @@ const StatusToggle = React.memo(({ studentId, status, onStatusChange, disabled }
     { val: STATUS.PRESENT, label: 'P', icon: CheckCircle,  activeClass: 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30', hoverClass: 'hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-500/10' },
     { val: STATUS.LATE,    label: 'L', icon: Clock,         activeClass: 'bg-amber-500  text-white shadow-lg shadow-amber-500/30',  hoverClass: 'hover:bg-amber-50  hover:text-amber-600  dark:hover:bg-amber-500/10'  },
     { val: STATUS.ABSENT,  label: 'A', icon: XCircle,       activeClass: 'bg-rose-500   text-white shadow-lg shadow-rose-500/30',   hoverClass: 'hover:bg-rose-50   hover:text-rose-600   dark:hover:bg-rose-500/10'   },
+    { val: STATUS.LEAVE,   label: 'V', icon: Calendar,      activeClass: 'bg-violet-500 text-white shadow-lg shadow-violet-500/30', hoverClass: 'hover:bg-violet-50 hover:text-violet-600 dark:hover:bg-violet-500/10' },
   ];
 
   return (
@@ -50,17 +51,22 @@ const StatusToggle = React.memo(({ studentId, status, onStatusChange, disabled }
 const StudentRow = React.memo(({ student, status, onStatusChange, isSaving, idx }) => {
   const isAbsent = status === STATUS.ABSENT;
   const isLate   = status === STATUS.LATE;
+  const isLeave  = status === STATUS.LEAVE;
 
   const rowBg = isAbsent
     ? 'bg-rose-50/60 dark:bg-rose-900/10 border-rose-200/60 dark:border-rose-800/30'
     : isLate
     ? 'bg-amber-50/60 dark:bg-amber-900/10 border-amber-200/60 dark:border-amber-800/30'
+    : isLeave
+    ? 'bg-violet-50/60 dark:bg-violet-900/10 border-violet-200/60 dark:border-violet-800/30'
     : 'bg-white dark:bg-slate-900 border-slate-200/60 dark:border-slate-800/40';
 
   const avatarBg = isAbsent
     ? 'bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400'
     : isLate
     ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
+    : isLeave
+    ? 'bg-violet-100 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400'
     : 'bg-primary-100 dark:bg-primary-500/20 text-primary-600 dark:text-primary-400';
 
   return (
@@ -91,6 +97,11 @@ const StudentRow = React.memo(({ student, status, onStatusChange, isSaving, idx 
       {isLate && (
         <span className="hidden xs:inline-flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-500/20 px-2 py-0.5 rounded-full flex-shrink-0">
           <Clock className="w-3 h-3" /> Late
+        </span>
+      )}
+      {isLeave && (
+        <span className="hidden xs:inline-flex items-center gap-1 text-xs font-bold text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-500/20 px-2 py-0.5 rounded-full flex-shrink-0">
+          <Calendar className="w-3 h-3" /> Leave
         </span>
       )}
 
@@ -235,6 +246,7 @@ const Attendance = () => {
       present: values.filter(s => s === STATUS.PRESENT).length,
       absent:  values.filter(s => s === STATUS.ABSENT).length,
       late:    values.filter(s => s === STATUS.LATE).length,
+      leave:   values.filter(s => s === STATUS.LEAVE).length,
     };
   }, [localStatuses, students]);
 
@@ -368,6 +380,9 @@ const Attendance = () => {
                 <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
                   <Clock className="w-3.5 h-3.5" />{stats.late}
                 </span>
+                <span className="flex items-center gap-1 text-violet-600 dark:text-violet-400">
+                  <Calendar className="w-3.5 h-3.5" />{stats.leave}
+                </span>
               </div>
 
               <div className="flex items-center gap-2 sm:ml-auto w-full sm:w-auto flex-wrap">
@@ -398,7 +413,7 @@ const Attendance = () => {
                           : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                         }`}
                     >
-                      {f === 'all' ? 'All' : f === 'present' ? `✓ ${stats.present}` : f === 'absent' ? `✗ ${stats.absent}` : `⏱ ${stats.late}`}
+                      {f === 'all' ? 'All' : f === 'present' ? `✓ ${stats.present}` : f === 'absent' ? `✗ ${stats.absent}` : f === 'late' ? `⏱ ${stats.late}` : `✈ ${stats.leave}`}
                     </button>
                   ))}
                 </div>

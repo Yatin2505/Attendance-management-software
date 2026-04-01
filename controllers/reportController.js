@@ -28,10 +28,13 @@ const getStudentReport = async (req, res) => {
           _id: '$batchId',
           totalDays: { $sum: 1 },
           presentDays: {
-            $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] }
+            $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] }
           },
           absentDays: {
             $sum: { $cond: [{ $eq: ['$status', 'absent'] }, 1, 0] }
+          },
+          leaveDays: {
+            $sum: { $cond: [{ $eq: ['$status', 'leave'] }, 1, 0] }
           }
         }
       },
@@ -51,10 +54,11 @@ const getStudentReport = async (req, res) => {
           totalDays: 1,
           presentDays: 1,
           absentDays: 1,
+          leaveDays: 1,
           percentage: {
             $cond: [
-              { $gt: ['$totalDays', 0] },
-              { $multiply: [ { $divide: ['$presentDays', '$totalDays'] }, 100 ] },
+              { $gt: [{ $subtract: ['$totalDays', '$leaveDays'] }, 0] },
+              { $multiply: [ { $divide: ['$presentDays', { $subtract: ['$totalDays', '$leaveDays'] }] }, 100 ] },
               0
             ]
           }
@@ -64,12 +68,13 @@ const getStudentReport = async (req, res) => {
     ]);
 
     // Calculate global stats dynamically
-    let globalTotal = 0, globalPresent = 0, globalAbsent = 0;
+    let globalTotal = 0, globalPresent = 0, globalAbsent = 0, globalLeave = 0;
     
     const batchReports = report.map(r => {
-      globalTotal += r.totalDays;
+      globalTotal   += r.totalDays;
       globalPresent += r.presentDays;
-      globalAbsent += r.absentDays;
+      globalAbsent  += r.absentDays;
+      globalLeave   += r.leaveDays;
       return {
         ...r,
         percentage: Number(r.percentage.toFixed(2))
@@ -81,10 +86,11 @@ const getStudentReport = async (req, res) => {
     res.status(200).json({
       student,
       stats: {
-        totalDays: globalTotal,
+        totalDays:   globalTotal,
         presentDays: globalPresent,
-        absentDays: globalAbsent,
-        percentage: getPercentage(globalPresent, globalTotal)
+        absentDays:  globalAbsent,
+        leaveDays:   globalLeave,
+        percentage:  getPercentage(globalPresent, globalTotal - globalLeave)
       },
       batchReports
     });
@@ -108,7 +114,10 @@ const getBatchReport = async (req, res) => {
           _id: '$studentId',
           totalDays: { $sum: 1 },
           presentDays: {
-            $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] }
+            $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] }
+          },
+          leaveDays: {
+            $sum: { $cond: [{ $eq: ['$status', 'leave'] }, 1, 0] }
           }
         }
       },
@@ -128,10 +137,11 @@ const getBatchReport = async (req, res) => {
           rollNumber: { $ifNull: ['$studentInfo.rollNumber', 'N/A'] },
           totalDays: 1,
           presentDays: 1,
+          leaveDays: 1,
           percentage: {
             $cond: [
-              { $gt: ['$totalDays', 0] },
-              { $multiply: [ { $divide: ['$presentDays', '$totalDays'] }, 100 ] },
+              { $gt: [{ $subtract: ['$totalDays', '$leaveDays'] }, 0] },
+              { $multiply: [ { $divide: ['$presentDays', { $subtract: ['$totalDays', '$leaveDays'] }] }, 100 ] },
               0
             ]
           }
@@ -187,7 +197,10 @@ const getMonthlyReport = async (req, res) => {
           _id: '$studentId',
           totalDays: { $sum: 1 },
           presentDays: {
-            $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] }
+            $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] }
+          },
+          leaveDays: {
+            $sum: { $cond: [{ $eq: ['$status', 'leave'] }, 1, 0] }
           }
         }
       },
@@ -206,10 +219,11 @@ const getMonthlyReport = async (req, res) => {
           rollNumber: { $ifNull: ['$studentInfo.rollNumber', 'N/A'] },
           totalDays: 1,
           presentDays: 1,
+          leaveDays: 1,
           percentage: {
             $cond: [
-              { $gt: ['$totalDays', 0] },
-              { $multiply: [ { $divide: ['$presentDays', '$totalDays'] }, 100 ] },
+              { $gt: [{ $subtract: ['$totalDays', '$leaveDays'] }, 0] },
+              { $multiply: [ { $divide: ['$presentDays', { $subtract: ['$totalDays', '$leaveDays'] }] }, 100 ] },
               0
             ]
           }
@@ -264,7 +278,10 @@ const getDateRangeReport = async (req, res) => {
           _id: '$studentId',
           totalDays: { $sum: 1 },
           presentDays: {
-            $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] }
+            $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] }
+          },
+          leaveDays: {
+            $sum: { $cond: [{ $eq: ['$status', 'leave'] }, 1, 0] }
           }
         }
       },
@@ -283,10 +300,11 @@ const getDateRangeReport = async (req, res) => {
           rollNumber: { $ifNull: ['$studentInfo.rollNumber', 'N/A'] },
           totalDays: 1,
           presentDays: 1,
+          leaveDays: 1,
           percentage: {
             $cond: [
-              { $gt: ['$totalDays', 0] },
-              { $multiply: [ { $divide: ['$presentDays', '$totalDays'] }, 100 ] },
+              { $gt: [{ $subtract: ['$totalDays', '$leaveDays'] }, 0] },
+              { $multiply: [ { $divide: ['$presentDays', { $subtract: ['$totalDays', '$leaveDays'] }] }, 100 ] },
               0
             ]
           }
