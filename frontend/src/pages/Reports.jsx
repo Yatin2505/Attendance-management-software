@@ -16,7 +16,7 @@ import {
   BarChart3, PieChart as PieIcon, Calendar, Users, FileText,
   Download, TrendingUp, TrendingDown, UserCheck, UserX, Clock,
   Filter, Activity, ChevronDown, ChevronUp, ChevronsUpDown,
-  Search, Layers, GraduationCap, AlertCircle, RefreshCw
+  Search, Layers, GraduationCap, AlertCircle, RefreshCw, DollarSign
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getFees } from '../services/feeService';
