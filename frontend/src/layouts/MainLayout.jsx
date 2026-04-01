@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import useAuth from '../hooks/useAuth';
+import { useAuth } from '../context/AuthContext';
 import ConfirmModal from '../components/ConfirmModal';
 import NotificationPanel from '../components/NotificationPanel';
 
