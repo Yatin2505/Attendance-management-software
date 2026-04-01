@@ -6,7 +6,8 @@ const {
   getStudentById,
   updateStudent,
   deleteStudent,
-  importStudents
+  importStudents,
+  getStudentProfile
 } = require('../controllers/studentController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -23,5 +24,7 @@ router.route('/:id')
   .get(getStudentById)
   .put(updateStudent)
   .delete(deleteStudent);
+
+router.get('/:id/profile', getStudentProfile);
 
 module.exports = router;

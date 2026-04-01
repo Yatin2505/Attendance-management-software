@@ -1,5 +1,7 @@
+const mongoose = require('mongoose');
 const Student = require('../models/Student');
 const Batch = require('../models/Batch');
+const Attendance = require('../models/Attendance');
 
 // @desc    Create a new student
 // @route   POST /api/students
@@ -225,11 +227,133 @@ const importStudents = async (req, res) => {
   }
 };
 
+// @desc    Get full student profile with attendance stats
+// @route   GET /api/students/:id/profile
+// @access  Private
+const getStudentProfile = async (req, res) => {
+  try {
+    const studentId = new mongoose.Types.ObjectId(req.params.id);
+
+    const [student, overallAgg, monthlyAgg, recentRecords] = await Promise.all([
+      Student.findById(studentId).populate('batches', 'name timing'),
+
+      // Overall attendance stats
+      Attendance.aggregate([
+        { $match: { studentId } },
+        {
+          $group: {
+            _id: '$batchId',
+            total:   { $sum: 1 },
+            present: { $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] } },
+            absent:  { $sum: { $cond: [{ $eq:  ['$status', 'absent'] }, 1, 0] } },
+            late:    { $sum: { $cond: [{ $eq:  ['$status', 'late']   }, 1, 0] } }
+          }
+        },
+        {
+          $lookup: {
+            from: 'batches', localField: '_id', foreignField: '_id', as: 'batchInfo'
+          }
+        },
+        { $unwind: { path: '$batchInfo', preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            batchName: { $ifNull: ['$batchInfo.name', 'Unknown'] },
+            total: 1, present: 1, absent: 1, late: 1,
+            percentage: {
+              $cond: [
+                { $gt: ['$total', 0] },
+                { $round: [{ $multiply: [{ $divide: ['$present', '$total'] }, 100] }, 1] },
+                0
+              ]
+            }
+          }
+        },
+        { $sort: { batchName: 1 } }
+      ]),
+
+      // Monthly attendance trend (last 6 months)
+      Attendance.aggregate([
+        { $match: { studentId } },
+        {
+          $group: {
+            _id: {
+              year:  { $year: '$date' },
+              month: { $month: '$date' }
+            },
+            total:   { $sum: 1 },
+            present: { $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] } }
+          }
+        },
+        { $sort: { '_id.year': -1, '_id.month': -1 } },
+        { $limit: 6 },
+        {
+          $project: {
+            year: '$_id.year', month: '$_id.month',
+            total: 1, present: 1,
+            percentage: {
+              $cond: [
+                { $gt: ['$total', 0] },
+                { $round: [{ $multiply: [{ $divide: ['$present', '$total'] }, 100] }, 0] },
+                0
+              ]
+            },
+            _id: 0
+          }
+        },
+        { $sort: { year: 1, month: 1 } }
+      ]),
+
+      // Last 20 attendance records
+      Attendance.find({ studentId })
+        .sort({ date: -1 })
+        .limit(20)
+        .populate('batchId', 'name')
+        .lean()
+    ]);
+
+    if (!student) return res.status(404).json({ message: 'Student not found' });
+
+    // Aggregate totals
+    const totalSessions = overallAgg.reduce((s, b) => s + b.total,   0);
+    const totalPresent  = overallAgg.reduce((s, b) => s + b.present, 0);
+    const totalAbsent   = overallAgg.reduce((s, b) => s + b.absent,  0);
+    const totalLate     = overallAgg.reduce((s, b) => s + b.late,    0);
+    const overallPct    = totalSessions > 0
+      ? Math.round((totalPresent / totalSessions) * 100)
+      : 0;
+
+    const MONTHS = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const monthly = monthlyAgg.map(m => ({
+      label: `${MONTHS[m.month]} ${m.year}`,
+      total: m.total, present: m.present,
+      percentage: m.percentage
+    }));
+
+    const history = recentRecords.map(r => ({
+      _id:       r._id,
+      date:      r.date,
+      status:    r.status,
+      batchName: r.batchId?.name ?? 'Unknown'
+    }));
+
+    res.status(200).json({
+      student,
+      stats: { totalSessions, totalPresent, totalAbsent, totalLate, overallPct },
+      batchBreakdown: overallAgg,
+      monthly,
+      history
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   createStudent,
   getStudents,
   getStudentById,
   updateStudent,
   deleteStudent,
-  importStudents
+  importStudents,
+  getStudentProfile
 };
