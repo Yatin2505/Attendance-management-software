@@ -26,7 +26,8 @@ const getDashboardStats = async (req, res) => {
       totalBatches,
       totalTeachers,
       todayRecords,
-      recentActivity
+      recentActivity,
+      feeAgg
     ] = await Promise.all([
       Student.countDocuments(),
       Batch.countDocuments(),
@@ -55,8 +56,7 @@ const getDashboardStats = async (req, res) => {
       ])
     ]);
 
-    const feeAgg = dashboardData[5] || [];
-    const feeTotals = feeAgg[0] || { totalAmount: 0, totalPaid: 0 };
+    const feeTotals = (feeAgg && feeAgg[0]) || { totalAmount: 0, totalPaid: 0 };
 
     // Today stats
     const todayPresent = todayRecords.filter(r => r.status === 'present').length;
