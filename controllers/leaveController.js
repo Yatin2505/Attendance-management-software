@@ -2,6 +2,7 @@ const LeaveRequest = require('../models/LeaveRequest');
 const Attendance = require('../models/Attendance');
 const Batch = require('../models/Batch');
 const mongoose = require('mongoose');
+const { notifyAdmins, createNotification } = require('./notificationController');
 
 // Helper: normalize a date to UTC midnight
 const toUTCMidnight = (dateInput) => {
@@ -132,6 +133,14 @@ const updateLeaveStatus = async (req, res) => {
     }
 
     res.status(200).json(leaveRequest);
+
+    // Trigger notification
+    const student = await require('../models/Student').findById(leaveRequest.studentId);
+    const msg = `Leave request for ${student?.name || 'Unknown'} has been ${status.toUpperCase()} by ${req.user.name}`;
+    await notifyAdmins('Leave Status Update', msg, status === 'approved' ? 'success' : 'error');
+    if (batch.teacherId && batch.teacherId.toString() !== req.user.id) {
+      await createNotification(batch.teacherId, 'Leave Status Update', msg, status === 'approved' ? 'success' : 'error');
+    }
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

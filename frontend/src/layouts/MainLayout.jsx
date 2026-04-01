@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '../context/AuthContext';
+import useAuth from '../hooks/useAuth';
 import ConfirmModal from '../components/ConfirmModal';
+import NotificationPanel from '../components/NotificationPanel';
 
 const MainLayout = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -199,18 +200,24 @@ const MainLayout = () => {
             </AnimatePresence>
           </div>
 
-          {/* Right: user avatar → profile */}
-          <Link to="/profile" className="flex items-center gap-2.5 group">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-bold text-slate-800 dark:text-white leading-none">{user?.name ?? 'User'}</p>
-              <p className="text-xs text-primary-600 dark:text-primary-400 font-bold uppercase tracking-wide mt-0.5">
-                {user?.role === 'teacher' ? 'Faculty' : 'Admin'}
-              </p>
-            </div>
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary-500 to-accent-500 flex items-center justify-center text-white font-bold text-sm shadow-md group-hover:scale-105 transition-transform">
-              {user?.name?.charAt(0).toUpperCase() ?? 'U'}
-            </div>
-          </Link>
+          {/* Right: notifications + user avatar → profile */}
+          <div className="flex items-center gap-2 sm:gap-4">
+            <NotificationPanel />
+            
+            <div className="h-6 w-px bg-slate-100 dark:bg-white/10 hidden sm:block" />
+
+            <Link to="/profile" className="flex items-center gap-2.5 group">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-bold text-slate-800 dark:text-white leading-none">{user?.name ?? 'User'}</p>
+                <p className="text-xs text-primary-600 dark:text-primary-400 font-bold uppercase tracking-wide mt-0.5">
+                  {user?.role === 'teacher' ? 'Faculty' : 'Admin'}
+                </p>
+              </div>
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary-500 to-accent-500 flex items-center justify-center text-white font-bold text-sm shadow-md group-hover:scale-105 transition-transform">
+                {user?.name?.charAt(0).toUpperCase() ?? 'U'}
+              </div>
+            </Link>
+          </div>
         </header>
 
         {/* Page content */}

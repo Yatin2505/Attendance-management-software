@@ -1,6 +1,7 @@
 const Batch = require('../models/Batch');
 const Student = require('../models/Student');
 const Attendance = require('../models/Attendance');
+const { notifyAdmins, createNotification } = require('./notificationController');
 
 // @desc    Create a new batch
 // @route   POST /api/batches
@@ -28,6 +29,13 @@ const createBatch = async (req, res) => {
     });
 
     res.status(201).json(batch);
+
+    // Trigger notification
+    const msg = `New batch ${batch.name} (${batch.timing}) has been created.`;
+    await notifyAdmins('New Batch Created', msg, 'success');
+    if (batch.teacherId && batch.teacherId.toString() !== req.user.id) {
+        await createNotification(batch.teacherId, 'New Batch Assigned', `You have been assigned to the new batch: ${batch.name}`, 'info');
+    }
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

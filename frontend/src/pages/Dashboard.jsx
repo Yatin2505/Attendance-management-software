@@ -11,6 +11,7 @@ import {
   Activity, Calendar
 } from 'lucide-react';
 import { getDashboardStats } from '../services/dashboardService';
+import notificationService from '../services/notificationService';
 import { useAuth } from '../context/AuthContext';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -112,6 +113,7 @@ const EmptyChart = ({ message = 'No data yet' }) => (
 const Dashboard = () => {
   const { user } = useAuth();
   const [data, setData] = useState(null);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -121,8 +123,12 @@ const Dashboard = () => {
     (async () => {
       try {
         setLoading(true);
-        const result = await getDashboardStats();
-        setData(result);
+        const [statsResult, notificationsResult] = await Promise.all([
+          getDashboardStats(),
+          notificationService.getNotifications()
+        ]);
+        setData(statsResult);
+        setNotifications(notificationsResult.notifications.slice(0, 5));
       } catch (err) {
         setError('Failed to load dashboard. Please refresh.');
       } finally {
@@ -355,96 +361,91 @@ const Dashboard = () => {
           <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
             <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />≥ 80%</span>
             <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400"><span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" />60–79%</span>
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400"><span className="w-2.5 h-2.5 rounded-sm bg-rose-500 inline-block" />{'< 60%'}</span>
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400"><span className="w-2.5 h-2.5 rounded-sm bg-rose-500 inline-block" />{' < 60%'}</span>
           </div>
         </motion.div>
       </div>
 
       {/* ── Bottom Row: Recent Activity + Quick Actions ──────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-
-        {/* Recent Activity — spans 3 cols */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        
+        {/* Recent Notifications */}
         <motion.div
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.32 }}
-          className="lg:col-span-3 premium-card p-5 flex flex-col"
+          className="lg:col-span-1 premium-card p-5 flex flex-col"
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-display font-bold text-slate-800 dark:text-white">Recent Activity</h2>
-            <Link to="/attendance" className="text-xs font-semibold text-primary-500 hover:text-primary-600 dark:text-primary-400 flex items-center gap-1">
-              Go to Attendance <ArrowRight className="w-3 h-3" />
-            </Link>
+            <h2 className="text-base font-display font-bold text-slate-800 dark:text-white">Latest Notifications</h2>
+            <div className="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-500/10 flex items-center justify-center">
+              <Bell className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+            </div>
           </div>
 
-          {recentActivity.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-slate-600 py-8">
-              <Activity className="w-8 h-8 opacity-40" />
-              <p className="text-sm font-medium">No recent activity</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {recentActivity.map((item, idx) => (
-                <div key={item._id ?? idx} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                  {/* Avatar */}
-                  <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-sm font-bold text-slate-500 dark:text-slate-400 flex-shrink-0">
-                    {item.studentName.charAt(0).toUpperCase()}
-                  </div>
-                  {/* Info */}
+          <div className="flex-1 space-y-3">
+            {notifications.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                <p className="text-xs font-medium">No recent notifications</p>
+              </div>
+            ) : (
+              notifications.map((n) => (
+                <div key={n._id} className="flex gap-3 group">
+                  <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${!n.isRead ? 'bg-primary-500 shadow-sm shadow-primary-500/50' : 'bg-slate-200 dark:bg-slate-700'}`} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">{item.studentName}
-                      <span className="text-xs font-normal text-slate-400 ml-1.5">#{item.rollNumber}</span>
-                    </p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{item.batchName} · {fmt(item.date)}</p>
+                    <p className={`text-xs font-bold leading-none mb-1 truncate ${!n.isRead ? 'text-slate-800 dark:text-white' : 'text-slate-500'}`}>{n.title}</p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 line-clamp-2 leading-relaxed">{n.message}</p>
                   </div>
-                  {/* Status */}
-                  <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg capitalize flex-shrink-0 ${statusColor(item.status)}`}>
-                    {statusIcon(item.status)}
-                    {item.status}
-                  </span>
                 </div>
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
+          <button className="mt-4 w-full py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-50 dark:bg-white/5 transition-all">
+            Open notification panel
+          </button>
         </motion.div>
 
-        {/* Quick Actions — spans 2 cols */}
+        {/* Recent Activity */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.34 }}
+          className="lg:col-span-1 premium-card p-5 flex flex-col"
+        >
+          <div className="flex items-center justify-between mb-4 text-slate-800 dark:text-white">
+            <h2 className="text-base font-display font-bold">Recent Attendance</h2>
+            <Link to="/attendance" className="p-1.5 bg-slate-100 dark:bg-white/5 rounded-lg text-slate-400 hover:text-primary-500 transition-colors">
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="flex-1 space-y-3">
+            {recentActivity.slice(0, 5).map((item, idx) => (
+              <div key={idx} className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${statusColor(item.status)}`}>
+                  {item.studentName.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-slate-800 dark:text-white truncate leading-none">{item.studentName}</p>
+                  <p className="text-[10px] text-slate-400 mt-1">{item.status} · {fmtShort(item.date)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Quick Actions */}
         <motion.div
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.36 }}
-          className="lg:col-span-2 premium-card p-5 flex flex-col"
+          className="lg:col-span-1 premium-card p-5 flex flex-col"
         >
           <h2 className="text-base font-display font-bold text-slate-800 dark:text-white mb-4">Quick Actions</h2>
-          <div className="flex flex-col gap-2.5">
-            <QuickAction
-              to="/attendance"
-              icon={CheckSquare}
-              label="Mark Attendance"
-              desc="Record today's session"
-              color="primary"
-            />
-            <QuickAction
-              to="/students"
-              icon={UserPlus}
-              label="Add Student"
-              desc="Enroll a new student"
-              color="blue"
-            />
-            <QuickAction
-              to="/batches"
-              icon={Plus}
-              label="Create Batch"
-              desc="Set up a new cohort"
-              color="violet"
-            />
-            <QuickAction
-              to="/reports"
-              icon={BarChart2}
-              label="View Reports"
-              desc="Detailed analytics"
-              color="emerald"
-            />
+          <div className="grid grid-cols-1 gap-2">
+            <QuickAction to="/attendance" icon={CheckSquare} label="Attendance" desc="Session record" color="primary" />
+            <QuickAction to="/students" icon={UserPlus} label="Student" desc="Enroll new" color="blue" />
+            <QuickAction to="/batches" icon={Plus} label="Batch" desc="Add cohort" color="violet" />
+            <QuickAction to="/reports" icon={BarChart2} label="Reports" desc="Analytics" color="emerald" />
           </div>
         </motion.div>
+
       </div>
     </div>
   );

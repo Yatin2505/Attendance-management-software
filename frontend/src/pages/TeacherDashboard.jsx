@@ -8,6 +8,8 @@ import { motion } from 'framer-motion';
 import { Users, Layers, CheckCircle, CalendarDays, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import SkeletonLoader from '../components/SkeletonLoader';
+import notificationService from '../services/notificationService';
+import { Bell, Info, CheckCircle as CheckCircleIcon, AlertTriangle, XCircle, ChevronRight } from 'lucide-react';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -33,6 +35,7 @@ const TeacherDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState([]);
   const [recentBatches, setRecentBatches] = useState([]);
+  const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -42,11 +45,13 @@ const TeacherDashboard = () => {
     try {
       setLoading(true);
       
-      const [studentsData, batchesData, allAttendance] = await Promise.all([
+      const [studentsData, batchesData, allAttendance, notificationsData] = await Promise.all([
         getStudents(),
         getBatches(),
-        getAttendance() // Assuming backend handles scoping based on logged-in teacher role
+        getAttendance(),
+        notificationService.getNotifications()
       ]);
+      setNotifications(notificationsData.notifications.slice(0, 4));
 
       const myBatchesData = batchesData.filter(b => b.teacherId === user._id || b.teacher === user._id);
       setRecentBatches(myBatchesData.slice(0, 3)); // show max 3 batches
@@ -218,6 +223,34 @@ const TeacherDashboard = () => {
           </div>
         </div>
         
+        {/* Notifications */}
+        <div className="glass-panel rounded-3xl xl:col-span-1 p-8 flex flex-col min-h-[400px]">
+          <h3 className="text-xl font-display font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+             <Bell className="text-accent-500 w-6 h-6" /> Recent Notifications
+          </h3>
+          <div className="space-y-4 flex-1">
+             {notifications.length > 0 ? (
+                notifications.map(n => (
+                  <div key={n._id} className="p-4 bg-white/50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-700/50 rounded-2xl relative overflow-hidden group">
+                    {!n.isRead && <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent-500" />}
+                    <div className="flex justify-between items-start">
+                      <p className={`text-xs font-bold ${!n.isRead ? 'text-slate-900 dark:text-white' : 'text-slate-500'}`}>{n.title}</p>
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        {new Date(n.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{n.message}</p>
+                  </div>
+                ))
+             ) : (
+                <div className="text-slate-500 text-sm italic py-4">No recent notifications.</div>
+             )}
+          </div>
+          <button className="mt-6 w-full py-3 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold rounded-2xl hover:bg-slate-200 dark:hover:bg-white/10 transition-all text-xs">
+            Open full panel
+          </button>
+        </div>
+
         {/* Chart */}
         <div className="glass-panel rounded-3xl xl:col-span-2 p-8 flex flex-col min-h-[400px]">
           <div className="flex justify-between items-center mb-8">

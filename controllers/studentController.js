@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Student = require('../models/Student');
 const Batch = require('../models/Batch');
 const Attendance = require('../models/Attendance');
+const { notifyAdmins } = require('./notificationController');
 
 // @desc    Create a new student
 // @route   POST /api/students
@@ -32,6 +33,10 @@ const createStudent = async (req, res) => {
     }
 
     res.status(201).json(student);
+
+    // Trigger notification
+    const msg = `New student ${student.name} (Roll: ${student.rollNumber}) has been added.`;
+    await notifyAdmins('New Student Added', msg, 'success');
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

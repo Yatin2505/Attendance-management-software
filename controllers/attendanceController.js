@@ -1,6 +1,7 @@
 const Attendance = require('../models/Attendance');
 const Student = require('../models/Student');
 const Batch = require('../models/Batch');
+const { notifyAdmins, createNotification } = require('./notificationController');
 
 // Helper: normalize a date to UTC midnight
 const toUTCMidnight = (dateInput) => {
@@ -52,6 +53,16 @@ const markAttendance = async (req, res) => {
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
+
+    // Trigger notification if absent
+    if (status === 'absent') {
+      const student = await Student.findById(studentId);
+      const msg = `Student ${student?.name || 'Unknown'} was marked ABSENT in ${batch.name}`;
+      await notifyAdmins('Student Absent', msg, 'warning');
+      if (batch.teacherId && batch.teacherId.toString() !== req.user.id) {
+        await createNotification(batch.teacherId, 'Student Absent', msg, 'warning');
+      }
+    }
 
     res.status(200).json(attendance);
   } catch (error) {
@@ -157,6 +168,14 @@ const markAttendanceBulk = async (req, res) => {
       modifiedCount: result.modifiedCount,
       total: records.length
     });
+
+    // Trigger notification for bulk marking
+    const absentCount = records.filter(r => r.status === 'absent').length;
+    const msg = `Attendance marked for batch ${batch.name}. Total: ${records.length}, Absentees: ${absentCount}`;
+    await notifyAdmins('Attendance Marked', msg, 'success');
+    if (batch.teacherId && batch.teacherId.toString() !== req.user.id) {
+      await createNotification(batch.teacherId, 'Attendance Marked', msg, 'success');
+    }
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
