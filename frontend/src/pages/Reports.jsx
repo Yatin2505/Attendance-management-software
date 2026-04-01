@@ -19,6 +19,7 @@ import {
   Search, Layers, GraduationCap, AlertCircle, RefreshCw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { getFees } from '../services/feeService';
 
 // ─── Theme colors ────────────────────────────────────────────────────────────
 const GREEN = '#10b981';
@@ -110,6 +111,7 @@ const REPORT_TYPES = [
   { value: 'monthly', label: 'Monthly',        icon: Calendar },
   { value: 'range',   label: 'Date Range',     icon: Clock },
   { value: 'student', label: 'Student-wise',   icon: GraduationCap },
+  { value: 'fees',    label: 'Financial Hub',  icon: DollarSign },
 ];
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -132,6 +134,8 @@ const Reports = () => {
   const [reportData,  setReportData]= useState(null);
   const [search,      setSearch]    = useState('');
   const [sort,        setSort]      = useState(['name', 'asc']); // [key, dir]
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [monthNameFilter, setMonthNameFilter] = useState('all');
 
   // ── Initial load ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -164,6 +168,13 @@ const Reports = () => {
       } else if (reportType === 'student') {
         if (!selStudentId) { toast.error('Please select a student'); return; }
         data = await getStudentReport(selStudentId);
+      } else if (reportType === 'fees') {
+        data = await getFees({
+          batchId: selBatchId || undefined,
+          status: statusFilter === 'all' ? undefined : statusFilter,
+          month: monthNameFilter !== 'all' ? monthNameFilter : undefined,
+          year: year || undefined
+        });
       }
       setReportData(data);
       toast.success('Report ready');
@@ -191,6 +202,7 @@ const Reports = () => {
     if (reportType === 'monthly') raw = reportData.data ?? [];
     if (reportType === 'range')   raw = reportData.data ?? [];
     if (reportType === 'student') raw = reportData.batchReports ?? [];
+    if (reportType === 'fees')    raw = reportData ?? [];
 
     // Search filter
     const q = search.toLowerCase().trim();
@@ -229,7 +241,12 @@ const Reports = () => {
         pct:     s.percentage,
       };
     }
-    const rows = tableRows;
+    if (reportType === 'fees') {
+      const total   = rows.reduce((a, r) => a + (r.amount ?? 0), 0);
+      const paid    = rows.reduce((a, r) => a + (r.paidAmount ?? 0), 0);
+      const pending = total - paid;
+      return { total, paid, pending, pct: total > 0 ? Math.round((paid / total) * 100) : 100 };
+    }
     const total   = rows.reduce((a, r) => a + (r.totalDays   ?? 0), 0);
     const present = rows.reduce((a, r) => a + (r.presentDays ?? 0), 0);
     const leave   = rows.reduce((a, r) => a + (r.leaveDays   ?? 0), 0);
@@ -258,6 +275,19 @@ const Reports = () => {
       ]);
       if (!rows.length) rows = [[st?.name, st?.rollNumber, s.totalDays, s.presentDays, s.absentDays, s.leaveDays, s.percentage]];
       filename = `student_report_${st?.rollNumber ?? 'export'}`;
+    } else if (reportType === 'fees') {
+      headers = ['Student', 'Roll Number', 'Total Amount', 'Paid Amount', 'Pending Amount', 'Status', 'Month', 'Year'];
+      rows = tableRows.map(r => [
+        r.studentId?.name ?? 'Unknown',
+        r.studentId?.rollNumber ?? '',
+        r.amount,
+        r.paidAmount,
+        r.amount - r.paidAmount,
+        r.status,
+        r.month,
+        r.year
+      ]);
+      filename = `fees_report_${year}_${monthNameFilter}`;
     } else {
       headers = ['Name', 'Roll Number', 'Total Days', 'Present Days', 'Absent Days', 'Leave Days', 'Attendance %'];
       rows = tableRows.map(r => [
@@ -288,6 +318,13 @@ const Reports = () => {
         'Attendance %': r.percentage,
       }));
     }
+    if (reportType === 'fees') {
+      return tableRows.slice(0, 20).map(r => ({
+        name: (r.studentId?.name ?? 'Unknown').split(' ')[0],
+        fullName: r.studentId?.name,
+        'Paid %': r.amount > 0 ? Math.round((r.paidAmount / r.amount) * 100) : 0,
+      }));
+    }
     return tableRows.slice(0, 20).map(r => ({
       name: (r.name ?? r.batchName ?? '').split(' ')[0],       // first word for narrow bars
       fullName: r.name ?? r.batchName ?? '',
@@ -297,12 +334,18 @@ const Reports = () => {
 
   const pieData = useMemo(() => {
     if (!stats) return [];
+    if (reportType === 'fees') {
+      return [
+        { name: 'Paid',    value: stats.paid },
+        { name: 'Pending', value: stats.pending },
+      ];
+    }
     return [
       { name: 'Present', value: stats.present },
       { name: 'Absent',  value: stats.absent  },
       { name: 'Leave',   value: stats.leave   },
     ];
-  }, [stats]);
+  }, [stats, reportType]);
 
   // ── Years list for monthly ──────────────────────────────────────────────────
   const yearOptions = useMemo(() => {
@@ -395,18 +438,21 @@ const Reports = () => {
           )}
 
           {/* Month + Year for monthly */}
-          {reportType === 'monthly' && (
+          {(reportType === 'monthly' || reportType === 'fees') && (
             <>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Month</label>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                   {reportType === 'fees' ? 'Billing Month' : 'Month'}
+                </label>
                 <select
                   id="filter-month"
-                  value={month}
-                  onChange={e => setMonth(e.target.value)}
+                  value={reportType === 'fees' ? monthNameFilter : month}
+                  onChange={e => reportType === 'fees' ? setMonthNameFilter(e.target.value) : setMonth(e.target.value)}
                   className="pl-3 pr-8 py-2.5 rounded-xl text-sm font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/40 appearance-none"
                 >
+                  {reportType === 'fees' && <option value="all">Any Month</option>}
                   {['January','February','March','April','May','June','July','August','September','October','November','December']
-                    .map((m, i) => <option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>)}
+                    .map((m, i) => <option key={i} value={reportType === 'fees' ? m : String(i+1).padStart(2,'0')}>{m}</option>)}
                 </select>
               </div>
               <div className="flex flex-col gap-1.5">
@@ -421,6 +467,23 @@ const Reports = () => {
                 </select>
               </div>
             </>
+          )}
+
+          {/* Status for Fees */}
+          {reportType === 'fees' && (
+            <div className="flex flex-col gap-1.5 min-w-[120px]">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Status</label>
+              <select
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+                className="pl-3 pr-8 py-2.5 rounded-xl text-sm font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/40 appearance-none"
+              >
+                <option value="all">All Status</option>
+                <option value="Paid">Paid</option>
+                <option value="Partial">Partial</option>
+                <option value="Pending">Pending</option>
+              </select>
+            </div>
           )}
 
           {/* Date range */}
@@ -518,7 +581,7 @@ const Reports = () => {
                   <p className="text-xs text-slate-400 mt-0.5 font-medium">
                     {tableRows.length} record{tableRows.length !== 1 ? 's' : ''} ·{' '}
                     <span className={stats.pct >= 75 ? 'text-emerald-500' : stats.pct >= 60 ? 'text-amber-500' : 'text-rose-500'}>
-                      {stats.pct}% overall attendance
+                      {reportType === 'fees' ? `${stats.pct}% collection rate` : `${stats.pct}% overall attendance`}
                     </span>
                   </p>
                 )}
@@ -533,7 +596,19 @@ const Reports = () => {
             </div>
 
             {/* ── Stat strip ─────────────────────────────────────────────── */}
-            {stats && (
+            {stats && reportType === 'fees' && (
+              <StatStrip items={[
+                { label: 'Total Amount',    value: `₹${stats.total.toLocaleString()}`, color: 'text-slate-800 dark:text-white' },
+                { label: 'Paid Amount',     value: `₹${stats.paid.toLocaleString()}`,  color: 'text-emerald-600 dark:text-emerald-400' },
+                { label: 'Pending Dues',    value: `₹${stats.pending.toLocaleString()}`, color: 'text-rose-600 dark:text-rose-400' },
+                { label: 'Collection Rate', value: `${stats.pct}%`,
+                  color: stats.pct >= 75 ? 'text-emerald-600 dark:text-emerald-400'
+                       : stats.pct >= 50 ? 'text-amber-600 dark:text-amber-400'
+                       : 'text-rose-600 dark:text-rose-400'
+                },
+              ]} />
+            )}
+            {stats && reportType !== 'fees' && (
               <StatStrip items={[
                 { label: 'Total Sessions', value: stats.total,   color: 'text-slate-800 dark:text-white'   },
                 { label: 'Present',        value: stats.present, color: 'text-emerald-600 dark:text-emerald-400' },
@@ -565,11 +640,11 @@ const Reports = () => {
                         <YAxis domain={[0, 100]} axisLine={false} tickLine={false}
                           tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={v => `${v}%`} />
                         <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(99,102,241,0.06)' }} />
-                        <Bar dataKey="Attendance %" radius={[4, 4, 0, 0]}>
+                        <Bar dataKey={reportType === 'fees' ? 'Paid %' : 'Attendance %'} radius={[4, 4, 0, 0]}>
                           {barChartData.map((entry, i) => (
                             <Cell key={i} fill={
-                              (entry['Attendance %'] ?? 0) >= 75 ? GREEN
-                            : (entry['Attendance %'] ?? 0) >= 60 ? AMBER : RED
+                              (entry[reportType === 'fees' ? 'Paid %' : 'Attendance %'] ?? 0) >= 75 ? GREEN
+                            : (entry[reportType === 'fees' ? 'Paid %' : 'Attendance %'] ?? 0) >= 50 ? AMBER : RED
                             } />
                           ))}
                         </Bar>
@@ -578,11 +653,19 @@ const Reports = () => {
                   </div>
                   {/* Color legend */}
                   <div className="flex items-center gap-4 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                    {[['≥ 75%', GREEN], ['60–74%', AMBER], ['< 60%', RED]].map(([l, c]) => (
-                      <span key={l} className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                        <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: c }} />{l}
-                      </span>
-                    ))}
+                    {reportType === 'fees' ? (
+                      [['≥ 75%', GREEN], ['50–74%', AMBER], ['< 50%', RED]].map(([l, c]) => (
+                        <span key={l} className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                          <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: c }} />{l}
+                        </span>
+                      ))
+                    ) : (
+                      [['≥ 75%', GREEN], ['60–74%', AMBER], ['< 60%', RED]].map(([l, c]) => (
+                        <span key={l} className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                          <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: c }} />{l}
+                        </span>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
@@ -602,9 +685,13 @@ const Reports = () => {
                             paddingAngle={5} dataKey="value"
                             stroke="none" cornerRadius={4}
                           >
-                            <Cell fill={GREEN} />
-                            <Cell fill={RED}   />
-                            <Cell fill={VIOLET}/>
+                            {pieData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={
+                                reportType === 'fees'
+                                  ? (entry.name === 'Paid' ? GREEN : RED)
+                                  : (entry.name === 'Present' ? GREEN : entry.name === 'Leave' ? VIOLET : RED)
+                              } />
+                            ))}
                           </Pie>
                           <Tooltip content={<ChartTooltip />} />
                           <Legend
@@ -676,21 +763,64 @@ const Reports = () => {
                         <th className="py-3 px-4 text-xs font-bold uppercase tracking-wide text-slate-400 w-8">#</th>
                         {reportType === 'student' ? (
                           <SortTh label="Batch"        sortKey="batchName"   sortState={sort} onSort={handleSort} />
+                        ) : reportType === 'fees' ? (
+                          <>
+                            <SortTh label="Student"    sortKey="studentId.name" sortState={sort} onSort={handleSort} />
+                            <SortTh label="Roll No."   sortKey="studentId.rollNumber" sortState={sort} onSort={handleSort} className="hidden sm:table-cell" />
+                          </>
                         ) : (
                           <>
                             <SortTh label="Name"       sortKey="name"        sortState={sort} onSort={handleSort} />
                             <SortTh label="Roll No."   sortKey="rollNumber"  sortState={sort} onSort={handleSort} className="hidden sm:table-cell" />
                           </>
                         )}
-                        <SortTh label="Total"          sortKey="totalDays"   sortState={sort} onSort={handleSort} className="text-center" />
-                        <SortTh label="Present"        sortKey="presentDays" sortState={sort} onSort={handleSort} className="text-center" />
-                        <SortTh label="Leave"          sortKey="leaveDays"   sortState={sort} onSort={handleSort} className="text-center" />
-                        <th className="py-3 px-4 text-xs font-bold uppercase tracking-wide text-slate-400 text-center">Absent</th>
-                        <SortTh label="Attendance %"   sortKey="percentage"  sortState={sort} onSort={handleSort} className="text-center" />
+                        {reportType === 'fees' ? (
+                          <>
+                            <SortTh label="Total"      sortKey="amount"      sortState={sort} onSort={handleSort} className="text-center" />
+                            <SortTh label="Paid"       sortKey="paidAmount"  sortState={sort} onSort={handleSort} className="text-center" />
+                            <th className="py-3 px-4 text-xs font-bold uppercase tracking-wide text-slate-400 text-center">Pending</th>
+                            <SortTh label="Month"      sortKey="month"       sortState={sort} onSort={handleSort} className="text-center" />
+                            <SortTh label="Status"     sortKey="status"      sortState={sort} onSort={handleSort} className="text-center" />
+                          </>
+                        ) : (
+                          <>
+                            <SortTh label="Total"      sortKey="totalDays"   sortState={sort} onSort={handleSort} className="text-center" />
+                            <SortTh label="Present"    sortKey="presentDays" sortState={sort} onSort={handleSort} className="text-center" />
+                            <SortTh label="Leave"      sortKey="leaveDays"   sortState={sort} onSort={handleSort} className="text-center" />
+                            <th className="py-3 px-4 text-xs font-bold uppercase tracking-wide text-slate-400 text-center">Absent</th>
+                            <SortTh label="Attendance %" sortKey="percentage" sortState={sort} onSort={handleSort} className="text-center" />
+                          </>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                       {tableRows.map((row, idx) => {
+                        if (reportType === 'fees') {
+                           return (
+                             <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                               <td className="py-3 px-4 text-xs text-slate-400 font-medium">{idx + 1}</td>
+                               <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-xs font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0">
+                                      {(row.studentId?.name ?? '?').charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="text-sm font-semibold text-slate-800 dark:text-white">{row.studentId?.name}</span>
+                                  </div>
+                               </td>
+                               <td className="py-3 px-4 text-xs font-mono text-slate-400 hidden sm:table-cell">{row.studentId?.rollNumber ?? '—'}</td>
+                               <td className="py-3 px-4 text-sm text-center text-slate-600 dark:text-slate-300 font-medium">₹{row.amount}</td>
+                               <td className="py-3 px-4 text-sm text-center font-bold text-emerald-600">₹{row.paidAmount}</td>
+                               <td className="py-3 px-4 text-sm text-center font-bold text-rose-600">₹{row.amount - row.paidAmount}</td>
+                               <td className="py-3 px-4 text-xs text-center text-slate-500 font-medium">{row.month} {row.year}</td>
+                               <td className="py-3 px-4 text-center">
+                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                   row.status === 'Paid' ? 'bg-emerald-100 text-emerald-600' : 
+                                   row.status === 'Partial' ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'
+                                 }`}>{row.status}</span>
+                               </td>
+                             </tr>
+                           );
+                        }
                         const absent = (row.totalDays ?? 0) - (row.presentDays ?? 0);
                         return (
                           <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
@@ -729,11 +859,23 @@ const Reports = () => {
                           <td colSpan={reportType === 'student' ? 2 : 3} className="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wide">
                             Total / Average
                           </td>
-                          <td className="py-3 px-4 text-center text-slate-800 dark:text-white">{stats.total}</td>
-                          <td className="py-3 px-4 text-center text-emerald-600 dark:text-emerald-400">{stats.present}</td>
-                          <td className="py-3 px-4 text-center text-violet-600 dark:text-violet-400">{stats.leave}</td>
-                          <td className="py-3 px-4 text-center text-rose-600 dark:text-rose-400">{stats.absent}</td>
-                          <td className="py-3 px-4 text-center"><PctBadge pct={stats.pct} /></td>
+                          {reportType === 'fees' ? (
+                            <>
+                              <td className="py-3 px-4 text-center text-slate-800 dark:text-white">₹{stats.total.toLocaleString()}</td>
+                              <td className="py-3 px-4 text-center text-emerald-600">₹{stats.paid.toLocaleString()}</td>
+                              <td className="py-3 px-4 text-center text-rose-600">₹{stats.pending.toLocaleString()}</td>
+                              <td className="py-3 px-4 text-center text-slate-400">—</td>
+                              <td className="py-3 px-4 text-center font-bold text-slate-800 dark:text-white">{stats.pct}%</td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="py-3 px-4 text-center text-slate-800 dark:text-white">{stats.total}</td>
+                              <td className="py-3 px-4 text-center text-emerald-600 dark:text-emerald-400">{stats.present}</td>
+                              <td className="py-3 px-4 text-center text-violet-600 dark:text-violet-400">{stats.leave}</td>
+                              <td className="py-3 px-4 text-center text-rose-600 dark:text-rose-400">{stats.absent}</td>
+                              <td className="py-3 px-4 text-center"><PctBadge pct={stats.pct} /></td>
+                            </>
+                          )}
                         </tr>
                       </tfoot>
                     )}

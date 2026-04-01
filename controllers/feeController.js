@@ -1,7 +1,9 @@
 const Fee = require('../models/Fee');
 const Student = require('../models/Student');
 const Batch = require('../models/Batch');
+const User = require('../models/User');
 const mongoose = require('mongoose');
+const { createNotification, notifyAdmins } = require('./notificationController');
 
 // @desc    Assign single student fee
 // @route   POST /api/fees
@@ -14,6 +16,18 @@ const createFee = async (req, res) => {
       studentId, amount, month, year, dueDate, description
     });
     
+    // Notify student
+    const user = await User.findOne({ studentId });
+    if (user) {
+      await createNotification(
+        user._id,
+        'Fee Assigned',
+        `A new fee of ₹${amount} for ${month} ${year} has been assigned to you.`,
+        'info',
+        '/student/dashboard'
+      );
+    }
+
     res.status(201).json(fee);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -39,6 +53,25 @@ const assignBatchFees = async (req, res) => {
     }));
     
     const result = await Fee.insertMany(feeRecords);
+
+    // Notify students
+    try {
+      const studentIds = students.map(s => s._id);
+      const feeUsers = await User.find({ studentId: { $in: studentIds } });
+      const promises = feeUsers.map(u => 
+        createNotification(
+          u._id,
+          'New Fee Assigned',
+          `A new fee of ₹${amount} for ${month} ${year} has been assigned to your batch.`,
+          'info',
+          '/student/dashboard'
+        )
+      );
+      await Promise.all(promises);
+    } catch (err) {
+      console.error('Batch notification error:', err);
+    }
+
     res.status(201).json({ count: result.length, message: 'Fees assigned to batch' });
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -61,6 +94,26 @@ const recordPayment = async (req, res) => {
     });
     
     await fee.save();
+
+    // Notify student
+    const feeUser = await User.findOne({ studentId: fee.studentId });
+    if (feeUser) {
+      await createNotification(
+        feeUser._id,
+        'Payment Recorded',
+        `A payment of ₹${amount} for ${fee.month} ${fee.year} has been confirmed. Current status: ${fee.status}`,
+        'success',
+        '/student/dashboard'
+      );
+    }
+
+    // Notify Admins
+    await notifyAdmins(
+      'Payment Confirmed',
+      `Payment of ₹${amount} recorded for student ${feeUser?.name || 'Unknown'}. Status: ${fee.status}`,
+      'success'
+    );
+
     res.status(200).json(fee);
   } catch (error) {
     res.status(400).json({ message: error.message });
