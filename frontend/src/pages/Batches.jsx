@@ -6,6 +6,7 @@ import { userService } from '../services/userService';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plus, Edit2, Trash2, ChevronDown, Clock, Users, X, UserMinus, UserPlus, FolderOpen } from 'lucide-react';
+import SkeletonLoader from '../components/SkeletonLoader';
 
 const Batches = () => {
   const [batches, setBatches] = useState([]);
@@ -188,8 +189,8 @@ const Batches = () => {
       </motion.div>
 
       {loading ? (
-        <div className="flex-1 flex justify-center items-center">
-          <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="flex-1 w-full mt-4">
+          <SkeletonLoader type="card" count={4} />
         </div>
       ) : (
         <div className="flex-1 space-y-4">

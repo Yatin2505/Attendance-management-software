@@ -3,7 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import MainLayout from './layouts/MainLayout';
-import Dashboard from './pages/Dashboard';
+import Index from './pages/Index';
 import Students from './pages/Students';
 import Batches from './pages/Batches';
 import Attendance from './pages/Attendance';
@@ -25,7 +25,7 @@ function App() {
               <MainLayout />
             </PrivateRoute>
           }>
-            <Route index element={<Dashboard />} />
+            <Route index element={<Index />} />
             <Route path="students" element={<Students />} />
             <Route path="batches" element={<Batches />} />
             <Route path="attendance" element={<Attendance />} />

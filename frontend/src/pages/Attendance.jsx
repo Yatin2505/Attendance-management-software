@@ -4,6 +4,7 @@ import { getAttendance, markAttendance, markAllPresent } from '../services/atten
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, Users, CheckCircle, XCircle, Clock, Save, CheckSquare, Inbox, GraduationCap } from 'lucide-react';
+import SkeletonLoader from '../components/SkeletonLoader';
 
 const Attendance = () => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -224,12 +225,9 @@ const Attendance = () => {
       ) : loadingData ? (
         <motion.div 
           initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          className="flex-1 flex justify-center items-center py-24 premium-card rounded-3xl"
+          className="flex-1 w-full mt-4"
         >
-           <div className="flex flex-col items-center">
-             <div className="w-16 h-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mb-6 shadow-lg shadow-primary-500/20"></div>
-             <p className="text-slate-500 dark:text-slate-400 font-bold tracking-wide animate-pulse">Synchronizing Records...</p>
-           </div>
+           <SkeletonLoader type="card" count={8} />
         </motion.div>
       ) : students.length === 0 ? (
         <motion.div 

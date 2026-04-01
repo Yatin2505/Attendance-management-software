@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { motion } from 'framer-motion';
 import { Users, Layers, CheckCircle, Download, Plus, UserPlus } from 'lucide-react';
+import SkeletonLoader from '../components/SkeletonLoader';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -122,8 +123,8 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="h-full flex justify-center items-center">
-        <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+      <div className="h-full flex flex-col space-y-8 mt-4">
+        <SkeletonLoader type="dashboard-widget" count={4} />
       </div>
     );
   }

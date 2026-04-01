@@ -3,21 +3,21 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary-900: #312e81;
-  --color-primary-600: #4f46e5;
-  --color-primary-500: #6366f1;
-  --color-primary-400: #818cf8;
-  --color-primary-300: #a5b4fc;
-  --color-primary-100: #e0e7ff;
-  --color-primary-50: #f0f3ff;
+  --color-primary-900: #1e3a8a; /* Corporate Blue */
+  --color-primary-600: #2563eb;
+  --color-primary-500: #3b82f6;
+  --color-primary-400: #60a5fa;
+  --color-primary-300: #93c5fd;
+  --color-primary-100: #dbeafe;
+  --color-primary-50: #eff6ff;
 
-  --color-accent-900: #2e1065;
-  --color-accent-600: #7c3aed;
-  --color-accent-500: #8b5cf6;
-  --color-accent-400: #a78bfa;
-  --color-accent-300: #c4b5fd;
-  --color-accent-100: #ede9fe;
-  --color-accent-50: #f5f3ff;
+  --color-accent-900: #0f172a; /* Slate/Dark Corporate */
+  --color-accent-600: #334155;
+  --color-accent-500: #475569;
+  --color-accent-400: #64748b;
+  --color-accent-300: #94a3b8;
+  --color-accent-100: #f1f5f9;
+  --color-accent-50: #f8fafc;
 
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-display: 'Outfit', system-ui, sans-serif;
@@ -41,29 +41,28 @@
 
 /* Premium smooth transitions class */
 .premium-card {
-  @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/20 dark:border-slate-800/50 rounded-2xl transition-all duration-300 hover:-translate-y-1;
-  box-shadow: 0 8px 30px rgb(0 0 0 / 0.04);
+  @apply bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl transition-all duration-300;
+  box-shadow: 0 4px 15px rgb(0 0 0 / 0.03);
 }
 .dark .premium-card {
-  box-shadow: 0 8px 30px rgb(0 0 0 / 0.2);
+  box-shadow: 0 4px 15px rgb(0 0 0 / 0.15);
 }
 .premium-card:hover {
-  box-shadow: 0 8px 30px rgb(99 102 241 / 0.1);
+  box-shadow: 0 8px 25px rgb(0 0 0 / 0.06);
 }
 
-/* Glass Panels */
+/* Corporate Glass Panels */
 .glass-panel {
-  @apply bg-white/70 dark:bg-[#04081c]/70 backdrop-blur-2xl border border-white/40 dark:border-white/5;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+  @apply bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 shadow-sm dark:border-slate-800;
 }
 
 .glass-nav {
-  @apply bg-white/60 dark:bg-[#020617]/60 backdrop-blur-xl border-b border-white/20 dark:border-white/5;
+  @apply bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-sm z-50;
 }
 
-/* Neon Glow Accents */
+/* Subtle Glow Accents instead of Neon */
 .neon-glow {
-  box-shadow: 0 0 15px rgba(99, 102, 241, 0.4), inset 0 0 10px rgba(99, 102, 241, 0.2);
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.2);
 }
 
 /* Elegant Table defaults */
@@ -93,19 +92,11 @@
   @apply bg-slate-300 dark:bg-slate-700;
 }
 
-/* Dynamic Gradients */
+/* Dynamic Gradients - Replaced with Clean Corporate Backgrounds */
 .bg-mesh-light {
-  background-color: #fafafa;
-  background-image:
-    radial-gradient(at 40% 20%, hsla(250, 100%, 74%, 0.15) 0px, transparent 50%),
-    radial-gradient(at 80% 0%, hsla(189, 100%, 56%, 0.15) 0px, transparent 50%),
-    radial-gradient(at 0% 50%, hsla(355, 100%, 93%, 0.1) 0px, transparent 50%);
+  background-color: #f8fafc; /* Very subtle slate-50 */
 }
 
 .bg-mesh-dark {
-  background-color: #020617;
-  background-image:
-    radial-gradient(at 40% 20%, hsla(250, 100%, 74%, 0.1) 0px, transparent 50%),
-    radial-gradient(at 80% 0%, hsla(189, 100%, 56%, 0.05) 0px, transparent 50%),
-    radial-gradient(at 0% 50%, hsla(250, 100%, 15%, 0.3) 0px, transparent 50%);
+  background-color: #0f172a; /* Slate 900 for modern dark mode */
 }
