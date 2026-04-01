@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   getStudents, createStudent, updateStudent,
-  deleteStudent, importStudents
+  deleteStudent, importStudents,
+  getStudentPortalStatus, enableStudentPortal
 } from '../services/studentService';
 import { getBatches } from '../services/batchService';
 import { getStudentReport } from '../services/reportService';
@@ -83,6 +84,7 @@ const Students = () => {
   const [students,       setStudents]       = useState([]);
   const [batches,        setBatches]        = useState([]);
   const [attPct,         setAttPct]         = useState({}); // { studentId: pct }
+  const [portalStatus,   setPortalStatus]   = useState({}); // { studentId: { enabled, email } }
   const [loading,        setLoading]        = useState(true);
 
   const [searchTerm,     setSearchTerm]     = useState('');
@@ -107,6 +109,13 @@ const Students = () => {
   const [deleting,       setDeleting]       = useState(false);
 
   const [importing,      setImporting]      = useState(false);
+  
+  // Portal Enable Modal
+  const [isPortalModalOpen, setIsPortalModalOpen] = useState(false);
+  const [portalTarget, setPortalTarget] = useState(null);
+  const [portalData, setPortalData] = useState({ email: '', password: '' });
+  const [portalProcessing, setPortalProcessing] = useState(false);
+
   const currentUser = getCurrentUser();
 
   // ── Load ────────────────────────────────────────────────────────────────────
@@ -139,6 +148,21 @@ const Students = () => {
       if (r.status === 'fulfilled') map[r.value.id] = r.value.pct;
     });
     setAttPct(map);
+
+    // Fetch portal status for visible students
+    fetchPortalStatuses(studentList);
+  };
+
+  const fetchPortalStatuses = async (studentList) => {
+    const slice = studentList.slice(0, 50);
+    const results = await Promise.allSettled(
+      slice.map(s => getStudentPortalStatus(s._id).then(d => ({ id: s._id, status: d })))
+    );
+    const map = {};
+    results.forEach(r => {
+      if (r.status === 'fulfilled') map[r.value.id] = r.value.status;
+    });
+    setPortalStatus(map);
   };
 
   // ── File import ─────────────────────────────────────────────────────────────
@@ -222,6 +246,28 @@ const Students = () => {
       toast.error(err.response?.data?.message || 'Failed to save student');
     } finally {
       setProcessing(false);
+    }
+  };
+
+  // ── Portal ──────────────────────────────────────────────────────────────────
+  const handleOpenPortalModal = (student) => {
+    setPortalTarget(student);
+    setPortalData({ email: '', password: '' });
+    setIsPortalModalOpen(true);
+  };
+
+  const handleEnablePortal = async (e) => {
+    e.preventDefault();
+    setPortalProcessing(true);
+    try {
+      await enableStudentPortal(portalTarget._id, portalData);
+      toast.success('Portal enabled for student');
+      setIsPortalModalOpen(false);
+      fetchPortalStatuses(students);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to enable portal');
+    } finally {
+      setPortalProcessing(false);
     }
   };
 
@@ -370,6 +416,7 @@ const Students = () => {
                 <th className="py-3.5 px-4">Roll No.</th>
                 <th className="py-3.5 px-4">Batches</th>
                 <th className="py-3.5 px-4 text-center">Attendance</th>
+                <th className="py-3.5 px-4">Portal</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -448,9 +495,27 @@ const Students = () => {
                           )}
                         </td>
 
-                        {/* Attendance % */}
                         <td className="py-3.5 px-4 text-center">
                           <PctBadge pct={pct} />
+                        </td>
+
+                        {/* Portal Status */}
+                        <td className="py-3.5 px-4">
+                          {portalStatus[student._id]?.enabled ? (
+                            <div className="flex flex-col">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                <CheckCircle className="w-2.5 h-2.5" /> Active
+                              </span>
+                              <span className="text-[9px] text-slate-400 truncate max-w-[100px]">{portalStatus[student._id].email}</span>
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => handleOpenPortalModal(student)}
+                              className="text-[10px] font-bold text-primary-500 hover:text-primary-600 underline"
+                            >
+                              Enable Portal
+                            </button>
+                          )}
                         </td>
 
                         {/* Actions */}
@@ -627,6 +692,55 @@ const Students = () => {
         studentId={profileId}
         onClose={() => setProfileId(null)}
       />
+
+      {/* ── Portal Enable Modal ──────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {isPortalModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm px-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 16 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 16 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden"
+            >
+               <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
+                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">Enable Portal Access</h3>
+                 <button onClick={() => setIsPortalModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+               </div>
+               <form onSubmit={handleEnablePortal} className="p-6 space-y-4">
+                  <p className="text-xs text-slate-500">Enable portal access for <strong>{portalTarget?.name}</strong> to let them view their attendance.</p>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Portal Email</label>
+                    <input 
+                      type="email" required placeholder="student@example.com"
+                      value={portalData.email}
+                      onChange={e => setPortalData({...portalData, email: e.target.value})}
+                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Initial Password</label>
+                    <input 
+                      type="password" required minLength={6} placeholder="Min 6 characters"
+                      value={portalData.password}
+                      onChange={e => setPortalData({...portalData, password: e.target.value})}
+                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <button 
+                    disabled={portalProcessing}
+                    className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-primary-500/25 transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    {portalProcessing ? 'Enabling...' : 'Enable Portal Access'}
+                  </button>
+               </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

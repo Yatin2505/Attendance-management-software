@@ -7,9 +7,12 @@ const {
   updateStudent,
   deleteStudent,
   importStudents,
-  getStudentProfile
+  getStudentProfile,
+  enableStudentPortal,
+  getStudentPortalStatus,
+  getStudentSelfProfile
 } = require('../controllers/studentController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
 // Protect all routes
 router.use(protect);
@@ -25,6 +28,11 @@ router.route('/:id')
   .put(updateStudent)
   .delete(deleteStudent);
 
-router.get('/:id/profile', getStudentProfile);
+router.get('/me/profile', getStudentSelfProfile);
+
+router.get('/:id/profile', authorize('admin', 'teacher'), getStudentProfile);
+
+router.post('/:id/enable-portal', authorize('admin'), enableStudentPortal);
+router.get('/:id/portal-status', authorize('admin'), getStudentPortalStatus);
 
 module.exports = router;

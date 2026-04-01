@@ -35,3 +35,18 @@ export const importStudents = async (students) => {
   const response = await api.post('/students/import', { students });
   return response.data;
 };
+
+export const getStudentSelfProfile = async () => {
+  const response = await api.get('/students/me/profile');
+  return response.data;
+};
+
+export const enableStudentPortal = async (id, portalData) => {
+  const response = await api.post(`/students/${id}/enable-portal`, portalData);
+  return response.data;
+};
+
+export const getStudentPortalStatus = async (id) => {
+  const response = await api.get(`/students/${id}/portal-status`);
+  return response.data;
+};

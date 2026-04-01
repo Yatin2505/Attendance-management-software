@@ -2,7 +2,10 @@ const mongoose = require('mongoose');
 const Student = require('../models/Student');
 const Batch = require('../models/Batch');
 const Attendance = require('../models/Attendance');
+const User = require('../models/User');
 const { notifyAdmins } = require('./notificationController');
+const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
 
 // @desc    Create a new student
 // @route   POST /api/students
@@ -356,6 +359,73 @@ const getStudentProfile = async (req, res) => {
   }
 };
 
+// @desc    Enable student portal (Admin only)
+// @route   POST /api/students/:id/enable-portal
+// @access  Private/Admin
+const enableStudentPortal = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Please provide email and password' });
+    }
+
+    const student = await Student.findById(req.params.id);
+    if (!student) return res.status(404).json({ message: 'Student not found' });
+
+    // Check if user already exists
+    let user = await User.findOne({ email });
+    if (user) return res.status(400).json({ message: 'Email already in use' });
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    user = await User.create({
+      name: student.name,
+      email,
+      password: hashedPassword,
+      role: 'student',
+      studentId: student._id
+    });
+
+    res.status(201).json({ message: 'Portal enabled successfully', userId: user._id });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Get student portal status (Admin only)
+// @route   GET /api/students/:id/portal-status
+// @access  Private/Admin
+const getStudentPortalStatus = async (req, res) => {
+  try {
+    const user = await User.findOne({ studentId: req.params.id, role: 'student' });
+    res.status(200).json({ 
+      enabled: !!user,
+      email: user ? user.email : null
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Get current student's own profile (Student only)
+// @route   GET /api/students/me/profile
+// @access  Private/Student
+const getStudentSelfProfile = async (req, res) => {
+  try {
+    if (req.user.role !== 'student' || !req.user.studentId) {
+      return res.status(403).json({ message: 'Access denied: Not a student account' });
+    }
+
+    // Reuse the same logic as getStudentProfile but using studentId from token
+    req.params.id = req.user.studentId;
+    return getStudentProfile(req, res);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   createStudent,
   getStudents,
@@ -363,5 +433,8 @@ module.exports = {
   updateStudent,
   deleteStudent,
   importStudents,
-  getStudentProfile
+  getStudentProfile,
+  enableStudentPortal,
+  getStudentPortalStatus,
+  getStudentSelfProfile
 };
