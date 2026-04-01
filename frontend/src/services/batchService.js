@@ -25,6 +25,12 @@ export const deleteBatch = async (id) => {
   return response.data;
 };
 
+export const getBatchStats = async (id) => {
+  const response = await api.get(`/batches/${id}/stats`);
+  return response.data;
+};
+
+
 export const assignStudentToBatch = async (batchId, studentId) => {
   const response = await api.post(`/batches/${batchId}/add-student`, { studentId });
   return response.data;

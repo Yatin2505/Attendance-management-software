@@ -1,5 +1,6 @@
 const Batch = require('../models/Batch');
 const Student = require('../models/Student');
+const Attendance = require('../models/Attendance');
 
 // @desc    Create a new batch
 // @route   POST /api/batches
@@ -215,6 +216,31 @@ const removeStudentFromBatch = async (req, res) => {
   }
 };
 
+// @desc    Get batch attendance stats (overall %)
+// @route   GET /api/batches/:id/stats
+// @access  Private
+const getBatchStats = async (req, res) => {
+  try {
+    const batchId = req.params.id;
+    const agg = await Attendance.aggregate([
+      { $match: { batchId: require('mongoose').Types.ObjectId.createFromHexString(batchId) } },
+      {
+        $group: {
+          _id: null,
+          total:   { $sum: 1 },
+          present: { $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] } }
+        }
+      }
+    ]);
+    const total   = agg[0]?.total   ?? 0;
+    const present = agg[0]?.present ?? 0;
+    const pct     = total > 0 ? Math.round((present / total) * 100) : null;
+    res.status(200).json({ total, present, pct });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   createBatch,
   getBatches,
@@ -222,5 +248,6 @@ module.exports = {
   updateBatch,
   deleteBatch,
   assignStudentToBatch,
-  removeStudentFromBatch
+  removeStudentFromBatch,
+  getBatchStats
 };

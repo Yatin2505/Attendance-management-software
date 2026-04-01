@@ -18,5 +18,6 @@ const deleteTeacher = async (id) => {
 export const userService = {
   getTeachers,
   createTeacher,
-  deleteTeacher
+  deleteTeacher,
 };
+

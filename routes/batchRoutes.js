@@ -7,7 +7,8 @@ const {
   updateBatch,
   deleteBatch,
   assignStudentToBatch,
-  removeStudentFromBatch
+  removeStudentFromBatch,
+  getBatchStats
 } = require('../controllers/batchController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -25,5 +26,6 @@ router.route('/:id')
 
 router.post('/:id/add-student', assignStudentToBatch);
 router.post('/:id/remove-student', removeStudentFromBatch);
+router.get('/:id/stats', getBatchStats);
 
 module.exports = router;
