@@ -266,16 +266,16 @@ const Dashboard = () => {
           iconColor="text-violet-600 dark:text-violet-400"
           delay={0.24}
         />
-        {isAdmin && (
+        {isAdmin && fees && (
           <>
             <StatCard
-              label="Fees Collected" value={`₹${fees.totalCollected?.toLocaleString() || 0}`}
+              label="Fees Collected" value={`₹${(fees.totalCollected || 0).toLocaleString()}`}
               icon={DollarSign} iconBg="bg-emerald-50 dark:bg-emerald-500/10"
               iconColor="text-emerald-600 dark:text-emerald-400"
               delay={0.28}
             />
             <StatCard
-              label="Pending Fees" value={`₹${fees.totalPending?.toLocaleString() || 0}`}
+              label="Pending Fees" value={`₹${(fees.totalPending || 0).toLocaleString()}`}
               icon={CreditCard} iconBg="bg-rose-50 dark:bg-rose-500/10"
               iconColor="text-rose-600 dark:text-rose-400"
               delay={0.32}

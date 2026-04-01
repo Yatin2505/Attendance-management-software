@@ -208,8 +208,8 @@ const Reports = () => {
     const q = search.toLowerCase().trim();
     if (q) {
       raw = raw.filter(r =>
-        (r.name        ?? r.batchName ?? '').toLowerCase().includes(q) ||
-        (r.rollNumber  ?? '').toLowerCase().includes(q) ||
+        (r.name        ?? r.batchName ?? r.studentId?.name ?? '').toLowerCase().includes(q) ||
+        (r.rollNumber  ?? r.studentId?.rollNumber ?? '').toLowerCase().includes(q) ||
         (r.batchName   ?? '').toLowerCase().includes(q)
       );
     }
@@ -217,8 +217,8 @@ const Reports = () => {
     // Sort
     const [key, dir] = sort;
     raw = [...raw].sort((a, b) => {
-      const av = a[key] ?? a['batchName'] ?? '';
-      const bv = b[key] ?? b['batchName'] ?? '';
+      const av = a[key] ?? a.studentId?.[key.split('.')[1]] ?? a['batchName'] ?? '';
+      const bv = b[key] ?? b.studentId?.[key.split('.')[1]] ?? b['batchName'] ?? '';
       if (typeof av === 'number') return dir === 'asc' ? av - bv : bv - av;
       return dir === 'asc'
         ? String(av).localeCompare(String(bv))
@@ -242,14 +242,14 @@ const Reports = () => {
       };
     }
     if (reportType === 'fees') {
-      const total   = rows.reduce((a, r) => a + (r.amount ?? 0), 0);
-      const paid    = rows.reduce((a, r) => a + (r.paidAmount ?? 0), 0);
+      const total   = tableRows.reduce((a, r) => a + (r.amount ?? 0), 0);
+      const paid    = tableRows.reduce((a, r) => a + (r.paidAmount ?? 0), 0);
       const pending = total - paid;
       return { total, paid, pending, pct: total > 0 ? Math.round((paid / total) * 100) : 100 };
     }
-    const total   = rows.reduce((a, r) => a + (r.totalDays   ?? 0), 0);
-    const present = rows.reduce((a, r) => a + (r.presentDays ?? 0), 0);
-    const leave   = rows.reduce((a, r) => a + (r.leaveDays   ?? 0), 0);
+    const total   = tableRows.reduce((a, r) => a + (r.totalDays   ?? 0), 0);
+    const present = tableRows.reduce((a, r) => a + (r.presentDays ?? 0), 0);
+    const leave   = tableRows.reduce((a, r) => a + (r.leaveDays   ?? 0), 0);
     const absent  = total - present - leave;
     const denom   = total - leave;
     return {
