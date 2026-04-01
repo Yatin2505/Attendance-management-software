@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   markAttendance,
+  markAttendanceBulk,
   markAllPresent,
   getAttendance,
   getAttendanceByStudent,
@@ -18,6 +19,7 @@ router.route('/')
   .get(getAttendance);
 
 router.post('/mark-all', markAllPresent);
+router.post('/bulk', markAttendanceBulk);
 
 router.get('/trends', getAttendanceTrends);
 

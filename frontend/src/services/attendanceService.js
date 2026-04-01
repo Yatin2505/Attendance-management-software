@@ -20,6 +20,12 @@ export const markAttendance = async (attendanceData) => {
   return response.data;
 };
 
+// Bulk upsert — sends all records in a single request (N records → 1 HTTP call)
+export const markAttendanceBulk = async (batchId, date, records) => {
+  const response = await api.post('/attendance/bulk', { batchId, date, records });
+  return response.data;
+};
+
 export const markAllPresent = async (batchId, date) => {
   const response = await api.post('/attendance/mark-all', { batchId, date });
   return response.data;

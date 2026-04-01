@@ -105,6 +105,61 @@ const markAllPresent = async (req, res) => {
   }
 };
 
+// @desc    Bulk upsert attendance for an entire batch (single request, uses bulkWrite)
+// @route   POST /api/attendance/bulk
+// @access  Private
+const markAttendanceBulk = async (req, res) => {
+  try {
+    const { batchId, date, records } = req.body;
+    // records: [{ studentId, status, notes? }]
+
+    if (!batchId || !date || !Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ message: 'Please provide batchId, date, and a non-empty records array' });
+    }
+
+    const validStatuses = ['present', 'absent', 'late'];
+    for (const r of records) {
+      if (!r.studentId || !validStatuses.includes(r.status)) {
+        return res.status(400).json({ message: `Invalid record: each entry needs studentId and a valid status` });
+      }
+    }
+
+    const batch = await Batch.findById(batchId);
+    if (!batch) return res.status(404).json({ message: 'Batch not found' });
+
+    if (!canAccessBatch(req.user, batch)) {
+      return res.status(403).json({ message: 'Not authorized to mark attendance for this batch' });
+    }
+
+    const attendanceDate = toUTCMidnight(date);
+
+    const bulkOps = records.map(({ studentId, status, notes }) => ({
+      updateOne: {
+        filter: { studentId, batchId, date: attendanceDate },
+        update: {
+          $set: {
+            status,
+            teacherId: req.user.id,
+            notes: notes || ''
+          }
+        },
+        upsert: true
+      }
+    }));
+
+    const result = await require('../models/Attendance').bulkWrite(bulkOps, { ordered: false });
+
+    res.status(200).json({
+      message: `Bulk upsert complete`,
+      upsertedCount: result.upsertedCount,
+      modifiedCount: result.modifiedCount,
+      total: records.length
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 // @desc    Get attendance (supports filtering by date, batchId, studentId via query params)
 // @route   GET /api/attendance
 // @access  Private
@@ -276,6 +331,7 @@ const getAttendanceTrends = async (req, res) => {
 
 module.exports = {
   markAttendance,
+  markAttendanceBulk,
   markAllPresent,
   getAttendance,
   getAttendanceByStudent,
