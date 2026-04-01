@@ -1,281 +1,443 @@
 import React, { useState, useEffect } from 'react';
-import { getStudents } from '../services/studentService';
-import { getBatches } from '../services/batchService';
-import { getDateRangeReport } from '../services/reportService';
-import { getAttendanceTrends } from '../services/attendanceService';
 import { Link } from 'react-router-dom';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { motion } from 'framer-motion';
-import { Users, Layers, CheckCircle, Download, Plus, UserPlus } from 'lucide-react';
-import SkeletonLoader from '../components/SkeletonLoader';
+import {
+  AreaChart, Area, BarChart, Bar,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell
+} from 'recharts';
+import {
+  Users, Layers, GraduationCap, CheckCircle, XCircle, Clock,
+  TrendingUp, CheckSquare, UserPlus, Plus, BarChart2, ArrowRight,
+  Activity, Calendar
+} from 'lucide-react';
+import { getDashboardStats } from '../services/dashboardService';
+import { useAuth } from '../context/AuthContext';
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1
-    }
-  }
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const fmt = (date) =>
+  new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+
+const fmtShort = (dateStr) => {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 };
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+const statusColor = (status) => {
+  if (status === 'present') return 'text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/10';
+  if (status === 'absent')  return 'text-rose-600 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/10';
+  return 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/10';
 };
 
+const statusIcon = (status) => {
+  if (status === 'present') return <CheckCircle className="w-3.5 h-3.5" />;
+  if (status === 'absent')  return <XCircle className="w-3.5 h-3.5" />;
+  return <Clock className="w-3.5 h-3.5" />;
+};
+
+// ─── Stat Card ────────────────────────────────────────────────────────────────
+const StatCard = ({ label, value, sub, icon: Icon, iconBg, iconColor, delay = 0 }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 16 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.3, delay }}
+    className="premium-card p-5 flex items-center gap-4"
+  >
+    <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
+      <Icon className={`w-5 h-5 ${iconColor}`} />
+    </div>
+    <div className="min-w-0">
+      <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5">{label}</p>
+      <p className="text-2xl font-display font-bold text-slate-900 dark:text-white leading-none">{value}</p>
+      {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-medium">{sub}</p>}
+    </div>
+  </motion.div>
+);
+
+// ─── Quick Action Button ──────────────────────────────────────────────────────
+const QuickAction = ({ to, icon: Icon, label, desc, color }) => (
+  <Link
+    to={to}
+    className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all duration-200 group
+      hover:border-${color}-300 dark:hover:border-${color}-500/40
+      hover:bg-${color}-50/50 dark:hover:bg-${color}-500/5
+      border-slate-200/70 dark:border-slate-800/70 bg-white dark:bg-slate-900`}
+  >
+    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0
+      bg-${color}-50 dark:bg-${color}-500/10
+      text-${color}-600 dark:text-${color}-400
+      group-hover:bg-${color}-100 dark:group-hover:bg-${color}-500/20 transition-colors`}>
+      <Icon className="w-4 h-4" />
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-semibold text-slate-800 dark:text-white">{label}</p>
+      <p className="text-xs text-slate-400 dark:text-slate-500">{desc}</p>
+    </div>
+    <ArrowRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-colors" />
+  </Link>
+);
+
+// ─── Custom Tooltip for Area Chart ───────────────────────────────────────────
+const AreaTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg px-3 py-2 text-xs font-semibold">
+      <p className="text-slate-500 dark:text-slate-400 mb-1">{label}</p>
+      <p className="text-primary-600 dark:text-primary-400">{payload[0]?.value}% attendance</p>
+    </div>
+  );
+};
+
+// ─── Custom Tooltip for Bar Chart ────────────────────────────────────────────
+const BarTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg px-3 py-2 text-xs font-semibold">
+      <p className="text-slate-500 dark:text-slate-400 mb-1 truncate max-w-[140px]">{label}</p>
+      <p className="text-emerald-600 dark:text-emerald-400">{payload[0]?.value}% attendance</p>
+    </div>
+  );
+};
+
+// ─── Empty Chart Placeholder ──────────────────────────────────────────────────
+const EmptyChart = ({ message = 'No data yet' }) => (
+  <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-slate-600 min-h-[160px]">
+    <BarChart2 className="w-8 h-8 opacity-40" />
+    <p className="text-sm font-medium">{message}</p>
+  </div>
+);
+
+// ─── Main Dashboard Component ─────────────────────────────────────────────────
 const Dashboard = () => {
-  const [stats, setStats] = useState({
-    totalStudents: 0,
-    totalBatches: 0,
-    todayPresent: 0,
-    todayAbsent: 0,
-    todayPercentage: 0
-  });
-  
+  const { user } = useAuth();
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [chartData, setChartData] = useState([]);
+  const [error, setError] = useState(null);
+
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
-    fetchDashboardData();
+    (async () => {
+      try {
+        setLoading(true);
+        const result = await getDashboardStats();
+        setData(result);
+      } catch (err) {
+        setError('Failed to load dashboard. Please refresh.');
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      const todayDate = new Date().toISOString().split('T')[0];
-      
-      const [studentsData, batchesData, todayReportData, trendsData] = await Promise.all([
-        getStudents(),
-        getBatches(),
-        getDateRangeReport(todayDate, todayDate),
-        getAttendanceTrends(30)
-      ]);
+  const today = new Date().toLocaleDateString('en-IN', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  });
 
-      let presentToday = 0;
-      let totalTodayLogs = 0;
-
-      if (todayReportData && todayReportData.data) {
-        todayReportData.data.forEach(student => {
-           presentToday += student.presentDays;
-           totalTodayLogs += student.totalDays;
-        });
-      }
-
-      const absentToday = totalTodayLogs - presentToday;
-      const pct = totalTodayLogs > 0 ? Math.round((presentToday / totalTodayLogs) * 100) : 0;
-
-      setStats({
-        totalStudents: studentsData.length,
-        totalBatches: batchesData.length,
-        todayPresent: presentToday,
-        todayAbsent: absentToday,
-        todayPercentage: pct
-      });
-
-      if (trendsData && trendsData.length > 0) {
-        const chartTimeseries = trendsData.map(dayStats => {
-           const formatObj = new Date(dayStats.date);
-           const displayDate = formatObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-           const percentage = dayStats.total > 0 ? Math.round((dayStats.present / dayStats.total) * 100) : 0;
-           
-           return {
-             name: displayDate,
-             percentage,
-             present: dayStats.present,
-             absent: dayStats.total - dayStats.present
-           };
-        });
-
-        setChartData(chartTimeseries);
-      } else {
-        setChartData([]);
-      }
-
-    } catch (error) {
-      console.error("Dashboard data load error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
+  // ── Loading skeleton ────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="h-full flex flex-col space-y-8 mt-4">
-        <SkeletonLoader type="dashboard-widget" count={4} />
+      <div className="flex flex-col gap-5 animate-pulse">
+        <div className="h-16 bg-slate-100 dark:bg-slate-800 rounded-2xl" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-24 bg-slate-100 dark:bg-slate-800 rounded-xl" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2 h-64 bg-slate-100 dark:bg-slate-800 rounded-xl" />
+          <div className="h-64 bg-slate-100 dark:bg-slate-800 rounded-xl" />
+        </div>
       </div>
     );
   }
 
+  // ── Error state ─────────────────────────────────────────────────────────────
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400">
+        <XCircle className="w-10 h-10 text-rose-400" />
+        <p className="font-medium text-slate-600 dark:text-slate-300">{error}</p>
+        <button onClick={() => window.location.reload()}
+          className="text-sm text-primary-500 hover:underline font-semibold">Retry</button>
+      </div>
+    );
+  }
+
+  const { counts, today: tod, overall, monthlyTrend, batchWise, recentActivity } = data;
+
+  // Bar chart: shorten batch name if too long
+  const barData = batchWise.map(b => ({
+    name: b.batchName.length > 12 ? b.batchName.slice(0, 12) + '…' : b.batchName,
+    fullName: b.batchName,
+    percentage: b.percentage
+  }));
+
+  // Bar colors based on percentage
+  const barColor = (pct) => {
+    if (pct >= 80) return '#10b981'; // emerald
+    if (pct >= 60) return '#f59e0b'; // amber
+    return '#f43f5e';                 // rose
+  };
+
   return (
-    <motion.div 
-      className="h-full flex flex-col space-y-8"
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-    >
-      {/* Header Area */}
-      <motion.div variants={itemVariants} className="flex flex-col md:flex-row justify-between items-start md:items-center glass-panel p-8 rounded-3xl">
+    <div className="flex flex-col gap-5 pb-6">
+
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+      >
         <div>
-          <h1 className="text-4xl font-display font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400 tracking-tight">Overview</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">{currentDate}</p>
+          <h1 className="text-2xl font-display font-bold text-slate-900 dark:text-white">Dashboard</h1>
+          <p className="text-sm text-slate-400 dark:text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
+            <Calendar className="w-3.5 h-3.5" />{today}
+          </p>
         </div>
-        <div className="mt-6 md:mt-0 flex gap-4">
-          <Link to="/attendance" className="px-6 py-3 bg-gradient-to-r from-primary-600 to-accent-600 text-white font-bold rounded-2xl shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2">
-            <CheckCircle className="w-5 h-5" />
-            Mark Attendance
-          </Link>
-          <Link to="/students" className="px-6 py-3 bg-white/50 dark:bg-slate-800/50 backdrop-blur-md text-slate-700 dark:text-slate-200 border border-slate-200/50 dark:border-slate-700 font-bold rounded-2xl shadow-sm hover:bg-white dark:hover:bg-slate-800 transition-all flex items-center gap-2">
-            <UserPlus className="w-5 h-5" />
-            Add Student
-          </Link>
+        <div className="flex items-center gap-2">
+          {overall.percentage > 0 && (
+            <span className={`inline-flex items-center gap-1.5 text-sm font-bold px-3 py-1.5 rounded-xl
+              ${overall.percentage >= 75
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+                : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+              }`}>
+              <TrendingUp className="w-3.5 h-3.5" />
+              {overall.percentage}% Overall
+            </span>
+          )}
         </div>
       </motion.div>
 
-      {/* KPI Cards Bento Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <motion.div variants={itemVariants} className="premium-card p-6 flex flex-col relative overflow-hidden group">
-          <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all"></div>
-          <div className="flex justify-between items-start relative z-10">
-            <div>
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Total Students</p>
-              <h3 className="text-4xl font-display font-bold text-slate-800 dark:text-white mt-2">{stats.totalStudents}</h3>
-            </div>
-            <div className="p-3 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-2xl border border-blue-100 dark:border-blue-500/20">
-              <Users className="w-6 h-6" />
-            </div>
+      {/* ── Stat Cards Row ───────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard
+          label="Students"   value={counts.totalStudents}
+          icon={Users}       iconBg="bg-blue-50 dark:bg-blue-500/10"
+          iconColor="text-blue-600 dark:text-blue-400"
+          delay={0}
+        />
+        <StatCard
+          label="Batches"    value={counts.totalBatches}
+          icon={Layers}      iconBg="bg-violet-50 dark:bg-violet-500/10"
+          iconColor="text-violet-600 dark:text-violet-400"
+          delay={0.04}
+        />
+        {isAdmin && (
+          <StatCard
+            label="Teachers"    value={counts.totalTeachers}
+            icon={GraduationCap} iconBg="bg-indigo-50 dark:bg-indigo-500/10"
+            iconColor="text-indigo-600 dark:text-indigo-400"
+            delay={0.08}
+          />
+        )}
+        <StatCard
+          label="Today's %" value={`${tod.percentage}%`}
+          sub={tod.total === 0 ? 'No records yet' : `${tod.total} records`}
+          icon={Activity}    iconBg={tod.percentage >= 75 ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-amber-50 dark:bg-amber-500/10'}
+          iconColor={tod.percentage >= 75 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}
+          delay={0.12}
+        />
+        <StatCard
+          label="Present"   value={tod.present}
+          sub="today"
+          icon={CheckCircle} iconBg="bg-emerald-50 dark:bg-emerald-500/10"
+          iconColor="text-emerald-600 dark:text-emerald-400"
+          delay={0.16}
+        />
+        <StatCard
+          label="Absent"    value={tod.absent}
+          sub="today"
+          icon={XCircle}    iconBg="bg-rose-50 dark:bg-rose-500/10"
+          iconColor="text-rose-600 dark:text-rose-400"
+          delay={0.2}
+        />
+      </div>
+
+      {/* ── Charts Row ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+
+        {/* Monthly Trend — spans 3 cols */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.24 }}
+          className="lg:col-span-3 premium-card p-5 flex flex-col"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-display font-bold text-slate-800 dark:text-white">Monthly Attendance %</h2>
+            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg">Last 30 days</span>
           </div>
-          <div className="mt-auto pt-6 flex items-center text-sm text-slate-500 dark:text-slate-400 font-medium">
-            <span>Active enrollments across all batches</span>
-          </div>
+
+          {monthlyTrend.length > 0 ? (
+            <div className="h-52 -ml-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={monthlyTrend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stopColor="#6366f1" stopOpacity={0.25} />
+                      <stop offset="95%"  stopColor="#6366f1" stopOpacity={0}    />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" strokeOpacity={0.5} />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={fmtShort}
+                    axisLine={false} tickLine={false}
+                    tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+                    interval="preserveStartEnd"
+                    dy={6}
+                  />
+                  <YAxis
+                    domain={[0, 100]} axisLine={false} tickLine={false}
+                    tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+                    tickFormatter={v => `${v}%`}
+                  />
+                  <Tooltip content={<AreaTooltip />} />
+                  <Area
+                    type="monotone" dataKey="percentage"
+                    stroke="#6366f1" strokeWidth={2.5}
+                    fill="url(#trendGrad)" dot={false} activeDot={{ r: 4, fill: '#6366f1' }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <EmptyChart message="No attendance records in the last 30 days" />
+          )}
         </motion.div>
 
-        <motion.div variants={itemVariants} className="premium-card p-6 flex flex-col relative overflow-hidden group">
-          <div className="absolute -right-6 -top-6 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-all"></div>
-          <div className="flex justify-between items-start relative z-10">
-            <div>
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Active Batches</p>
-              <h3 className="text-4xl font-display font-bold text-slate-800 dark:text-white mt-2">{stats.totalBatches}</h3>
-            </div>
-            <div className="p-3 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-2xl border border-purple-100 dark:border-purple-500/20">
-              <Layers className="w-6 h-6" />
-            </div>
+        {/* Batch-wise Attendance — spans 2 cols */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.28 }}
+          className="lg:col-span-2 premium-card p-5 flex flex-col"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-display font-bold text-slate-800 dark:text-white">Batch-wise Attendance</h2>
           </div>
-          <div className="mt-auto pt-6 flex items-center text-sm text-slate-500 dark:text-slate-400 font-medium">
-            <span>Total active cohorts mapped</span>
-          </div>
-        </motion.div>
 
-        <motion.div variants={itemVariants} className="premium-card p-6 flex flex-col relative overflow-hidden group">
-          <div className="absolute -right-6 -top-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all"></div>
-          <div className="flex justify-between items-start relative z-10">
-            <div>
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Today's Rate</p>
-              <h3 className="text-4xl font-display font-bold text-slate-800 dark:text-white mt-2">{stats.todayPercentage}%</h3>
+          {barData.length > 0 ? (
+            <div className="h-52 -ml-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={barData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }} barSize={20}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" strokeOpacity={0.5} />
+                  <XAxis
+                    dataKey="name" axisLine={false} tickLine={false}
+                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 500 }} dy={6}
+                  />
+                  <YAxis
+                    domain={[0, 100]} axisLine={false} tickLine={false}
+                    tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+                    tickFormatter={v => `${v}%`}
+                  />
+                  <Tooltip content={<BarTooltip />} cursor={{ fill: 'rgba(99,102,241,0.06)' }} />
+                  <Bar dataKey="percentage" radius={[4, 4, 0, 0]}>
+                    {barData.map((entry, idx) => (
+                      <Cell key={idx} fill={barColor(entry.percentage)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-            <div className={`p-3 rounded-2xl border ${stats.todayPercentage >= 75 ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20' : 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-500/20'}`}>
-              <CheckCircle className="w-6 h-6" />
-            </div>
+          ) : (
+            <EmptyChart message="No batch data yet" />
+          )}
+
+          {/* Legend */}
+          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />≥ 80%</span>
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400"><span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" />60–79%</span>
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400"><span className="w-2.5 h-2.5 rounded-sm bg-rose-500 inline-block" />{'< 60%'}</span>
           </div>
-          <div className="mt-auto pt-6 flex items-center text-sm font-bold">
-            <span className="text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 rounded-lg">{stats.todayPresent} Present</span>
-            <span className="text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 px-2 py-1 rounded-lg ml-2">{stats.todayAbsent} Absent</span>
-          </div>
-        </motion.div>
-        
-        <motion.div variants={itemVariants} className="premium-card p-6 flex flex-col justify-between bg-gradient-to-br from-primary-600 to-accent-600 text-white border-transparent shadow-lg shadow-primary-500/20 relative overflow-hidden">
-           <div className="absolute inset-0 bg-white/10 mix-blend-overlay"></div>
-           <div className="relative z-10 h-full flex flex-col">
-              <h3 className="text-2xl font-display font-bold mb-2">Export Data</h3>
-              <p className="text-primary-100 text-sm font-medium leading-relaxed mb-6">Download comprehensive attendance analytics instantly.</p>
-              <Link to="/reports" className="mt-auto w-full inline-flex justify-center items-center gap-2 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/30 text-white font-bold rounded-xl shadow-sm transition-all duration-300">
-                <Download className="w-4 h-4" />
-                View Analytics
-              </Link>
-           </div>
         </motion.div>
       </div>
 
-      {/* Data Tables & Charts Bento Area */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 xl:grid-cols-3 gap-6 flex-1 pb-6">
-        
-        {/* Visual Chart - spans 2 columns */}
-        <div className="glass-panel rounded-3xl xl:col-span-2 p-8 flex flex-col min-h-[400px]">
-          <div className="flex justify-between items-center mb-8">
-            <h3 className="text-xl font-display font-bold text-slate-800 dark:text-white">Attendance Trend</h3>
-            <span className="text-xs font-bold px-3 py-1.5 bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 rounded-lg border border-primary-100 dark:border-primary-500/20">Last 30 Days</span>
+      {/* ── Bottom Row: Recent Activity + Quick Actions ──────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+
+        {/* Recent Activity — spans 3 cols */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.32 }}
+          className="lg:col-span-3 premium-card p-5 flex flex-col"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-display font-bold text-slate-800 dark:text-white">Recent Activity</h2>
+            <Link to="/attendance" className="text-xs font-semibold text-primary-500 hover:text-primary-600 dark:text-primary-400 flex items-center gap-1">
+              Go to Attendance <ArrowRight className="w-3 h-3" />
+            </Link>
           </div>
-          
-          {chartData.length > 0 ? (
-             <div className="flex-1 w-full h-full min-h-[250px] -ml-4">
-               <ResponsiveContainer width="100%" height="100%">
-                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                   <defs>
-                     <linearGradient id="colorPct" x1="0" y1="0" x2="0" y2="1">
-                       <stop offset="5%" stopColor="#818cf8" stopOpacity={0.4}/>
-                       <stop offset="95%" stopColor="#818cf8" stopOpacity={0}/>
-                     </linearGradient>
-                   </defs>
-                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 13, fontWeight: 500}} dy={15} />
-                   <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 13, fontWeight: 500}} domain={[0, 100]} dx={-10} />
-                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" strokeOpacity={0.5} />
-                   <Tooltip 
-                     cursor={{ stroke: '#818cf8', strokeWidth: 1.5, strokeDasharray: '4 4' }} 
-                     contentStyle={{ backgroundColor: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(10px)', borderRadius: '16px', border: '1px solid rgba(226,232,240,0.8)', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)', fontWeight: 600, color: '#0f172a' }} 
-                     itemStyle={{ color: '#4f46e5', fontWeight: 700 }}
-                     formatter={(value, name) => [name === 'percentage' ? `${value}%` : value, name.charAt(0).toUpperCase() + name.slice(1)]}
-                   />
-                   <Area type="monotone" dataKey="percentage" name="Attendance Rate" stroke="#6366f1" strokeWidth={4} fillOpacity={1} fill="url(#colorPct)" />
-                 </AreaChart>
-               </ResponsiveContainer>
-             </div>
+
+          {recentActivity.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-slate-600 py-8">
+              <Activity className="w-8 h-8 opacity-40" />
+              <p className="text-sm font-medium">No recent activity</p>
+            </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/50">
-              <Layers className="w-12 h-12 mb-4 opacity-50" />
-              <p className="font-medium">Not enough data to render chart.</p>
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {recentActivity.map((item, idx) => (
+                <div key={item._id ?? idx} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                  {/* Avatar */}
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-sm font-bold text-slate-500 dark:text-slate-400 flex-shrink-0">
+                    {item.studentName.charAt(0).toUpperCase()}
+                  </div>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">{item.studentName}
+                      <span className="text-xs font-normal text-slate-400 ml-1.5">#{item.rollNumber}</span>
+                    </p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{item.batchName} · {fmt(item.date)}</p>
+                  </div>
+                  {/* Status */}
+                  <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg capitalize flex-shrink-0 ${statusColor(item.status)}`}>
+                    {statusIcon(item.status)}
+                    {item.status}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
-        </div>
+        </motion.div>
 
-        {/* Quick Actions / Activity Feed */}
-        <div className="glass-panel rounded-3xl p-8 flex flex-col min-h-[400px]">
-          <h3 className="text-xl font-display font-bold text-slate-800 dark:text-white mb-6">Quick Actions</h3>
-          <div className="space-y-4 flex-1">
-             <Link to="/batches" className="group flex items-center p-5 bg-white/50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-700/50 rounded-2xl hover:border-primary-300 dark:hover:border-primary-500/50 hover:bg-primary-50/50 dark:hover:bg-primary-900/20 transition-all duration-300">
-                <div className="w-12 h-12 rounded-xl bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400 flex items-center justify-center group-hover:bg-primary-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-primary-500/30 transition-all duration-300">
-                   <Plus className="w-6 h-6" />
-                </div>
-                <div className="ml-5">
-                  <p className="text-base font-bold text-slate-800 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">Create Batch</p>
-                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5">Organize new cohorts</p>
-                </div>
-             </Link>
-             
-             <Link to="/students" className="group flex items-center p-5 bg-white/50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-700/50 rounded-2xl hover:border-accent-300 dark:hover:border-accent-500/50 hover:bg-accent-50/50 dark:hover:bg-accent-900/20 transition-all duration-300">
-                <div className="w-12 h-12 rounded-xl bg-accent-100 dark:bg-accent-900/40 text-accent-600 dark:text-accent-400 flex items-center justify-center group-hover:bg-accent-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-accent-500/30 transition-all duration-300">
-                   <UserPlus className="w-6 h-6" />
-                </div>
-                <div className="ml-5">
-                  <p className="text-base font-bold text-slate-800 dark:text-white group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors">Enroll Students</p>
-                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5">Add to existing batches</p>
-                </div>
-             </Link>
+        {/* Quick Actions — spans 2 cols */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.36 }}
+          className="lg:col-span-2 premium-card p-5 flex flex-col"
+        >
+          <h2 className="text-base font-display font-bold text-slate-800 dark:text-white mb-4">Quick Actions</h2>
+          <div className="flex flex-col gap-2.5">
+            <QuickAction
+              to="/attendance"
+              icon={CheckSquare}
+              label="Mark Attendance"
+              desc="Record today's session"
+              color="primary"
+            />
+            <QuickAction
+              to="/students"
+              icon={UserPlus}
+              label="Add Student"
+              desc="Enroll a new student"
+              color="blue"
+            />
+            <QuickAction
+              to="/batches"
+              icon={Plus}
+              label="Create Batch"
+              desc="Set up a new cohort"
+              color="violet"
+            />
+            <QuickAction
+              to="/reports"
+              icon={BarChart2}
+              label="View Reports"
+              desc="Detailed analytics"
+              color="emerald"
+            />
           </div>
-          
-          <div className="mt-8 pt-6 border-t border-slate-200/50 dark:border-slate-800/50 flex justify-between items-center">
-             <div className="flex -space-x-3">
-               {[1,2,3].map(i => (
-                 <div key={i} className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-900 bg-slate-200 dark:bg-slate-700"></div>
-               ))}
-               <div className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-900 bg-primary-100 dark:bg-primary-900/50 flex items-center justify-center text-[10px] font-bold text-primary-600 dark:text-primary-400">+{stats.totalBatches}</div>
-             </div>
-             <p className="text-xs text-slate-400 dark:text-slate-500 font-bold tracking-widest uppercase">System V2.0</p>
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
+        </motion.div>
+      </div>
+    </div>
   );
 };
 
