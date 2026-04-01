@@ -81,7 +81,51 @@ const loginUser = async (req, res) => {
   }
 };
 
+// @desc    Get current logged-in user profile
+// @route   GET /api/auth/me
+// @access  Private
+const getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Change current user's password
+// @route   PUT /api/auth/change-password
+// @access  Private
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Please provide current and new password' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters' });
+    }
+
+    const user = await User.findById(req.user.id);
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.status(200).json({ message: 'Password updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   registerUser,
-  loginUser
+  loginUser,
+  getMe,
+  changePassword
 };

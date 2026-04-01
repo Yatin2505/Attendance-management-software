@@ -15,6 +15,7 @@ import {
 import * as XLSX from 'xlsx';
 import { getCurrentUser } from '../services/authService';
 import StudentProfile from '../components/StudentProfile';
+import Pagination from '../components/Pagination';
 
 // ─── Attendance % badge ───────────────────────────────────────────────────────
 const PctBadge = ({ pct }) => {
@@ -89,6 +90,10 @@ const Students = () => {
 
   // Profile drawer
   const [profileId,      setProfileId]      = useState(null);
+
+  // Pagination
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
 
   // Modal — add/edit
   const [isModalOpen,    setIsModalOpen]    = useState(false);
@@ -235,9 +240,10 @@ const Students = () => {
     }
   };
 
-  // ── Filter ──────────────────────────────────────────────────────────────────
+  // ── Filter + Paginate ────────────────────────────────────────────────────
   const filteredStudents = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
+    setPage(1); // reset to page 1 when filter changes
     return students.filter(s => {
       const matchesSearch = !q ||
         s.name.toLowerCase().includes(q) ||
@@ -247,6 +253,9 @@ const Students = () => {
       return matchesSearch && matchesBatch;
     });
   }, [students, searchTerm, filterBatch]);
+
+  const totalPages = Math.ceil(filteredStudents.length / PAGE_SIZE);
+  const pagedStudents = filteredStudents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -389,7 +398,7 @@ const Students = () => {
                 </tr>
               ) : (
                 <AnimatePresence initial={false}>
-                  {filteredStudents.map((student, idx) => {
+                  {pagedStudents.map((student, idx) => {
                     const pct = attPct[student._id];
                     return (
                       <motion.tr
@@ -478,7 +487,19 @@ const Students = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        <div className="px-5 pb-4">
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            pageSize={PAGE_SIZE}
+            totalItems={filteredStudents.length}
+          />
+        </div>
       </motion.div>
+
 
       {/* ── Add/Edit modal ───────────────────────────────────────────────────── */}
       <AnimatePresence>

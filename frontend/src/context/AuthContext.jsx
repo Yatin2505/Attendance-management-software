@@ -11,11 +11,8 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in
     const cachedUser = getCurrentUser();
-    if (cachedUser) {
-      setUser(cachedUser);
-    }
+    if (cachedUser) setUser(cachedUser);
     setLoading(false);
   }, []);
 
@@ -23,10 +20,11 @@ export const AuthProvider = ({ children }) => {
     try {
       const data = await loginUser(email, password);
       setUser(data);
-      toast.success('Logged in successfully');
+      toast.success(`Welcome back, ${data.name}!`);
       return data;
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to login');
+      const msg = error.response?.data?.message || 'Invalid email or password';
+      toast.error(msg);
       throw error;
     }
   };
@@ -34,11 +32,18 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     logoutService();
     setUser(null);
-    toast.success('Logged out successfully');
+    toast.success('Signed out successfully');
+  };
+
+  // Allow profile page / other components to refresh in-memory user
+  const updateUser = (updates) => {
+    const merged = { ...user, ...updates };
+    localStorage.setItem('user', JSON.stringify(merged));
+    setUser(merged);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateUser }}>
       {!loading && children}
     </AuthContext.Provider>
   );
