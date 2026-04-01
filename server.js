@@ -67,6 +67,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/leave', require('./routes/leaveRoutes'));
+app.use('/api/fees', require('./routes/feeRoutes'));
 
 const PORT = process.env.PORT || 5000;
 

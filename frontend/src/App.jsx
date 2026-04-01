@@ -14,6 +14,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
 import LeaveManagement from './pages/LeaveManagement';
+import Fees from './pages/Fees';
 
 function App() {
   return (
@@ -51,6 +52,7 @@ function App() {
             {/* Admin-only routes */}
             <Route path="reports"  element={<RoleRoute role="admin"><Reports /></RoleRoute>} />
             <Route path="teachers" element={<RoleRoute role="admin"><Teachers /></RoleRoute>} />
+            <Route path="fees"     element={<RoleRoute role="admin"><Fees /></RoleRoute>} />
           </Route>
         </Routes>
       </AuthProvider>

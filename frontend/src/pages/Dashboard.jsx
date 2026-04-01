@@ -8,7 +8,7 @@ import {
 import {
   Users, Layers, GraduationCap, CheckCircle, XCircle, Clock,
   TrendingUp, CheckSquare, UserPlus, Plus, BarChart2, ArrowRight,
-  Activity, Calendar
+  Activity, Calendar, DollarSign, CreditCard, Bell
 } from 'lucide-react';
 import { getDashboardStats } from '../services/dashboardService';
 import notificationService from '../services/notificationService';
@@ -171,7 +171,7 @@ const Dashboard = () => {
     );
   }
 
-  const { counts, today: tod, overall, monthlyTrend, batchWise, recentActivity } = data;
+  const { counts, today: tod, overall, monthlyTrend, batchWise, recentActivity, fees } = data;
 
   // Bar chart: shorten batch name if too long
   const barData = batchWise.map(b => ({
@@ -266,6 +266,22 @@ const Dashboard = () => {
           iconColor="text-violet-600 dark:text-violet-400"
           delay={0.24}
         />
+        {isAdmin && (
+          <>
+            <StatCard
+              label="Fees Collected" value={`₹${fees.totalCollected?.toLocaleString() || 0}`}
+              icon={DollarSign} iconBg="bg-emerald-50 dark:bg-emerald-500/10"
+              iconColor="text-emerald-600 dark:text-emerald-400"
+              delay={0.28}
+            />
+            <StatCard
+              label="Pending Fees" value={`₹${fees.totalPending?.toLocaleString() || 0}`}
+              icon={CreditCard} iconBg="bg-rose-50 dark:bg-rose-500/10"
+              iconColor="text-rose-600 dark:text-rose-400"
+              delay={0.32}
+            />
+          </>
+        )}
       </div>
 
       {/* ── Charts Row ──────────────────────────────────────────────────────── */}

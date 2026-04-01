@@ -3,13 +3,14 @@ import { motion } from 'framer-motion';
 import {
   GraduationCap, CheckCircle, XCircle, Clock,
   TrendingUp, Layers, Calendar, Activity,
-  AlertCircle, RefreshCw, Download, FileText
+  AlertCircle, RefreshCw, Download, FileText, Wallet
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
 } from 'recharts';
 import { getStudentSelfProfile } from '../services/studentService';
+import { getMyFees } from '../services/feeService';
 import { useAuth } from '../context/AuthContext';
 import * as XLSX from 'xlsx';
 
@@ -55,6 +56,7 @@ const ChartTooltip = ({ active, payload, label }) => {
 const StudentDashboard = () => {
   const { user } = useAuth();
   const [data, setData] = useState(null);
+  const [fees, setFees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -66,8 +68,12 @@ const StudentDashboard = () => {
     try {
       setLoading(true);
       setError(null);
-      const profile = await getStudentSelfProfile();
+      const [profile, feeData] = await Promise.all([
+        getStudentSelfProfile(),
+        getMyFees()
+      ]);
       setData(profile);
+      setFees(feeData);
     } catch (err) {
       setError('Failed to load your attendance data.');
     } finally {
@@ -179,6 +185,34 @@ const StudentDashboard = () => {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="premium-card p-5">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <Wallet className="w-3 h-3" /> Fee Status
+            </h4>
+            {fees.length > 0 ? (
+              <div className="space-y-3">
+                 {fees.slice(0, 2).map(f => (
+                   <div key={f._id} className="p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/5">
+                      <div className="flex justify-between items-start mb-1.5">
+                        <p className="text-xs font-bold text-slate-800 dark:text-white">{f.month} {f.year}</p>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                          f.status === 'Paid' ? 'bg-emerald-100 text-emerald-600' : 
+                          f.status === 'Partial' ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'
+                        }`}>{f.status}</span>
+                      </div>
+                      <div className="flex justify-between items-end">
+                        <p className="text-[10px] text-slate-500">Balance: <span className="font-bold text-slate-700 dark:text-slate-200">₹{f.amount - f.paidAmount}</span></p>
+                        <p className="text-[9px] text-slate-400 font-medium">Due: {new Date(f.dueDate).toLocaleDateString()}</p>
+                      </div>
+                   </div>
+                 ))}
+                 {fees.length > 2 && <p className="text-center text-[10px] text-primary-500 font-bold cursor-pointer hover:underline">View all fee records</p>}
+              </div>
+            ) : (
+              <p className="text-center py-4 text-[10px] text-slate-400 italic">No fee records found.</p>
+            )}
           </div>
         </div>
 

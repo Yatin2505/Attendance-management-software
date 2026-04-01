@@ -3,13 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, GraduationCap, CheckCircle, XCircle, Clock,
   TrendingUp, TrendingDown, Layers, Calendar, Activity,
-  AlertCircle, RefreshCw
+  AlertCircle, RefreshCw, Wallet, DollarSign, CreditCard
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend
 } from 'recharts';
 import { getStudentProfile } from '../services/studentService';
+import { getFees } from '../services/feeService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const GREEN  = '#10b981';
@@ -84,18 +85,33 @@ const ChartTooltip = ({ active, payload, label }) => {
 // ─── Main Component ───────────────────────────────────────────────────────────
 const StudentProfile = ({ studentId, onClose }) => {
   const [data, setData] = useState(null);
+  const [fees, setFees] = useState([]);
+  const [activeTab, setActiveTab] = useState('attendance'); // 'attendance' or 'fees'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     if (!studentId) return;
-    setLoading(true);
-    setError(null);
-    getStudentProfile(studentId)
-      .then(setData)
-      .catch(() => setError('Failed to load profile'))
-      .finally(() => setLoading(false));
+    fetchProfile();
   }, [studentId]);
+
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [profileData, feeData] = await Promise.all([
+        getStudentProfile(studentId),
+        getFees({ studentId })
+      ]);
+      setData(profileData);
+      setFees(feeData);
+    } catch (err) {
+      setError('Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -136,6 +152,32 @@ const StudentProfile = ({ studentId, onClose }) => {
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* ── Tabs ────────────────────────────────────────────────────── */}
+            {data && !loading && (
+              <div className="flex px-6 pt-4 bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
+                <button 
+                  onClick={() => setActiveTab('attendance')}
+                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
+                    activeTab === 'attendance' 
+                    ? 'border-primary-500 text-primary-600' 
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  Attendance
+                </button>
+                <button 
+                  onClick={() => setActiveTab('fees')}
+                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
+                    activeTab === 'fees' 
+                    ? 'border-primary-500 text-primary-600' 
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  Financials
+                </button>
+              </div>
+            )}
 
             {/* ── Body ───────────────────────────────────────────────────── */}
             <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-5 space-y-6">
@@ -339,6 +381,88 @@ const StudentProfile = ({ studentId, onClose }) => {
                     </div>
                   )}
                 </>
+              )}
+
+              {data && activeTab === 'fees' && !loading && (
+                <div className="space-y-6">
+                  {/* Fee Summary Cards */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20">
+                      <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-1 leading-tight text-center">Paid</p>
+                      <p className="text-xl font-display font-bold text-emerald-700 dark:text-emerald-300 text-center">
+                        ₹{fees.reduce((sum, f) => sum + f.paidAmount, 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20">
+                      <p className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest mb-1 leading-tight text-center">Balance</p>
+                      <p className="text-xl font-display font-bold text-rose-700 dark:text-rose-300 text-center">
+                        ₹{fees.reduce((sum, f) => sum + (f.amount - f.paidAmount), 0).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Fee Records */}
+                  <div className="space-y-3">
+                    <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+                      <CreditCard className="w-3.5 h-3.5" /> Billing Records
+                    </h3>
+                    {fees.length === 0 ? (
+                      <div className="text-center py-12 text-slate-400 italic text-sm">No fee records assigned to this student.</div>
+                    ) : (
+                      fees.map(f => (
+                        <div key={f._id} className="premium-card p-4 space-y-3">
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-white/5 flex items-center justify-center">
+                                <Wallet className="w-4 h-4 text-slate-500" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold text-slate-800 dark:text-white">{f.month} {f.year}</p>
+                                <p className="text-[10px] text-slate-400 font-medium">{f.description}</p>
+                              </div>
+                            </div>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                              f.status === 'Paid' ? 'bg-emerald-100 text-emerald-600' : 
+                              f.status === 'Partial' ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'
+                            }`}>{f.status}</span>
+                          </div>
+                          
+                          <div className="grid grid-cols-3 gap-2 py-2 border-y border-slate-50 dark:border-white/5">
+                             <div>
+                               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Amount</p>
+                               <p className="text-sm font-bold text-slate-800 dark:text-white">₹{f.amount}</p>
+                             </div>
+                             <div>
+                               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Paid</p>
+                               <p className="text-sm font-bold text-emerald-600">₹{f.paidAmount}</p>
+                             </div>
+                             <div>
+                               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Remaining</p>
+                               <p className="text-sm font-bold text-rose-600">₹{f.amount - f.paidAmount}</p>
+                             </div>
+                          </div>
+
+                          <div className="flex justify-between items-center">
+                            <p className="text-[10px] text-slate-400 flex items-center gap-1.5"><Calendar className="w-3 h-3"/> Due: {new Date(f.dueDate).toLocaleDateString()}</p>
+                            {f.paymentHistory?.length > 0 && (
+                              <details className="cursor-pointer group">
+                                <summary className="text-[10px] font-bold text-primary-500 hover:underline list-none">View Payment Log</summary>
+                                <div className="mt-2 text-[10px] space-y-1 p-2 bg-slate-50 dark:bg-white/5 rounded-lg">
+                                  {f.paymentHistory.map((p, i) => (
+                                    <div key={i} className="flex justify-between border-b border-slate-100 dark:border-white/5 pb-1 mb-1 last:border-0">
+                                      <span className="text-slate-500">{new Date(p.paymentDate).toLocaleDateString()}</span>
+                                      <span className="font-bold text-emerald-600">₹{p.amount} <small className="text-slate-400 font-normal">({p.paymentMethod})</small></span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           </motion.aside>

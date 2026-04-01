@@ -3,6 +3,7 @@ const Attendance = require('../models/Attendance');
 const Student = require('../models/Student');
 const Batch = require('../models/Batch');
 const User = require('../models/User');
+const Fee = require('../models/Fee');
 
 // Helper: normalize a date to UTC midnight
 const toUTCMidnight = (dateInput) => {
@@ -41,8 +42,21 @@ const getDashboardStats = async (req, res) => {
         .limit(5)
         .populate('studentId', 'name rollNumber')
         .populate('batchId', 'name')
-        .lean()
+        .lean(),
+      // Fee stats
+      Fee.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalAmount: { $sum: '$amount' },
+            totalPaid:   { $sum: '$paidAmount' }
+          }
+        }
+      ])
     ]);
+
+    const feeAgg = dashboardData[5] || [];
+    const feeTotals = feeAgg[0] || { totalAmount: 0, totalPaid: 0 };
 
     // Today stats
     const todayPresent = todayRecords.filter(r => r.status === 'present').length;
@@ -172,7 +186,11 @@ const getDashboardStats = async (req, res) => {
       },
       monthlyTrend,
       batchWise,
-      recentActivity: activity
+      recentActivity: activity,
+      fees: {
+        totalCollected: feeTotals.totalPaid,
+        totalPending:   feeTotals.totalAmount - feeTotals.totalPaid
+      }
     });
   } catch (error) {
     console.error('Dashboard error:', error);
