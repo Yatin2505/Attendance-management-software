@@ -6,7 +6,8 @@ const {
   getAttendance,
   getAttendanceByStudent,
   updateAttendance,
-  deleteAttendance
+  deleteAttendance,
+  getAttendanceTrends
 } = require('../controllers/attendanceController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -17,6 +18,8 @@ router.route('/')
   .get(getAttendance);
 
 router.post('/mark-all', markAllPresent);
+
+router.get('/trends', getAttendanceTrends);
 
 router.get('/student/:id', getAttendanceByStudent);
 

@@ -120,18 +120,19 @@ const getBatchReport = async (req, res) => {
           as: 'studentInfo'
         }
       },
-      { $unwind: '$studentInfo' },
+      { $unwind: { path: '$studentInfo', preserveNullAndEmptyArrays: true } },
       {
         $project: {
           studentId: '$_id',
-          name: '$studentInfo.name',
-          rollNumber: '$studentInfo.rollNumber',
+          name: { $ifNull: ['$studentInfo.name', 'Deleted Student'] },
+          rollNumber: { $ifNull: ['$studentInfo.rollNumber', 'N/A'] },
           totalDays: 1,
           presentDays: 1,
           percentage: {
-            $multiply: [
-              { $divide: ['$presentDays', '$totalDays'] },
-              100
+            $cond: [
+              { $gt: ['$totalDays', 0] },
+              { $multiply: [ { $divide: ['$presentDays', '$totalDays'] }, 100 ] },
+              0
             ]
           }
         }
@@ -142,7 +143,7 @@ const getBatchReport = async (req, res) => {
     // Format percentage nicely
     const formattedReport = report.map(r => ({
       ...r,
-      percentage: Number(r.percentage.toFixed(2))
+      percentage: Number((r.percentage || 0).toFixed(2))
     }));
 
     const batch = await Batch.findById(batchId).select('name timing');
@@ -198,17 +199,18 @@ const getMonthlyReport = async (req, res) => {
           as: 'studentInfo'
         }
       },
-      { $unwind: '$studentInfo' },
+      { $unwind: { path: '$studentInfo', preserveNullAndEmptyArrays: true } },
       {
         $project: {
-          name: '$studentInfo.name',
-          rollNumber: '$studentInfo.rollNumber',
+          name: { $ifNull: ['$studentInfo.name', 'Deleted Student'] },
+          rollNumber: { $ifNull: ['$studentInfo.rollNumber', 'N/A'] },
           totalDays: 1,
           presentDays: 1,
           percentage: {
-            $multiply: [
-              { $divide: ['$presentDays', '$totalDays'] },
-              100
+            $cond: [
+              { $gt: ['$totalDays', 0] },
+              { $multiply: [ { $divide: ['$presentDays', '$totalDays'] }, 100 ] },
+              0
             ]
           }
         }
@@ -218,7 +220,7 @@ const getMonthlyReport = async (req, res) => {
 
     const formattedReport = report.map(r => ({
       ...r,
-      percentage: Number(r.percentage.toFixed(2))
+      percentage: Number((r.percentage || 0).toFixed(2))
     }));
 
     res.status(200).json({
@@ -274,17 +276,18 @@ const getDateRangeReport = async (req, res) => {
           as: 'studentInfo'
         }
       },
-      { $unwind: '$studentInfo' },
+      { $unwind: { path: '$studentInfo', preserveNullAndEmptyArrays: true } },
       {
         $project: {
-          name: '$studentInfo.name',
-          rollNumber: '$studentInfo.rollNumber',
+          name: { $ifNull: ['$studentInfo.name', 'Deleted Student'] },
+          rollNumber: { $ifNull: ['$studentInfo.rollNumber', 'N/A'] },
           totalDays: 1,
           presentDays: 1,
           percentage: {
-            $multiply: [
-              { $divide: ['$presentDays', '$totalDays'] },
-              100
+            $cond: [
+              { $gt: ['$totalDays', 0] },
+              { $multiply: [ { $divide: ['$presentDays', '$totalDays'] }, 100 ] },
+              0
             ]
           }
         }
@@ -294,7 +297,7 @@ const getDateRangeReport = async (req, res) => {
 
     const formattedReport = report.map(r => ({
       ...r,
-      percentage: Number(r.percentage.toFixed(2))
+      percentage: Number((r.percentage || 0).toFixed(2))
     }));
 
     res.status(200).json({

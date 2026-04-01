@@ -10,6 +10,11 @@ export const getAttendance = async (date, batchId, studentId) => {
   return response.data;
 };
 
+export const getAttendanceTrends = async (days = 30) => {
+  const response = await api.get(`/attendance/trends?days=${days}`);
+  return response.data;
+};
+
 export const markAttendance = async (attendanceData) => {
   const response = await api.post('/attendance', attendanceData);
   return response.data;

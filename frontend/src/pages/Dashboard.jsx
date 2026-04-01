@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getStudents } from '../services/studentService';
 import { getBatches } from '../services/batchService';
 import { getDateRangeReport } from '../services/reportService';
-import { getAttendance } from '../services/attendanceService';
+import { getAttendanceTrends } from '../services/attendanceService';
 import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { motion } from 'framer-motion';
@@ -45,11 +45,11 @@ const Dashboard = () => {
       setLoading(true);
       const todayDate = new Date().toISOString().split('T')[0];
       
-      const [studentsData, batchesData, todayReportData, allAttendance] = await Promise.all([
+      const [studentsData, batchesData, todayReportData, trendsData] = await Promise.all([
         getStudents(),
         getBatches(),
         getDateRangeReport(todayDate, todayDate),
-        getAttendance()
+        getAttendanceTrends(30)
       ]);
 
       let presentToday = 0;
@@ -73,31 +73,11 @@ const Dashboard = () => {
         todayPercentage: pct
       });
 
-      if (allAttendance && allAttendance.length > 0) {
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        
-        const dateMap = {};
-        allAttendance.forEach(record => {
-           const recDate = new Date(record.date);
-           if (recDate >= thirtyDaysAgo) {
-             const dayStr = recDate.toISOString().split('T')[0];
-             if (!dateMap[dayStr]) {
-               dateMap[dayStr] = { total: 0, present: 0 };
-             }
-             dateMap[dayStr].total += 1;
-             if (record.status === 'present') {
-               dateMap[dayStr].present += 1;
-             }
-           }
-        });
-
-        const sortedDates = Object.keys(dateMap).sort();
-        const chartTimeseries = sortedDates.map(dateStr => {
-           const formatObj = new Date(dateStr);
+      if (trendsData && trendsData.length > 0) {
+        const chartTimeseries = trendsData.map(dayStats => {
+           const formatObj = new Date(dayStats.date);
            const displayDate = formatObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-           const dayStats = dateMap[dateStr];
-           const percentage = Math.round((dayStats.present / dayStats.total) * 100);
+           const percentage = dayStats.total > 0 ? Math.round((dayStats.present / dayStats.total) * 100) : 0;
            
            return {
              name: displayDate,

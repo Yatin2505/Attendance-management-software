@@ -8,6 +8,7 @@ import Students from './pages/Students';
 import Batches from './pages/Batches';
 import Attendance from './pages/Attendance';
 import Reports from './pages/Reports';
+import Teachers from './pages/Teachers';
 import Login from './pages/Login';
 import Register from './pages/Register';
 
@@ -30,6 +31,7 @@ function App() {
             <Route path="batches" element={<Batches />} />
             <Route path="attendance" element={<Attendance />} />
             <Route path="reports" element={<Reports />} />
+            <Route path="teachers" element={<Teachers />} />
           </Route>
         </Routes>
       </AuthProvider>

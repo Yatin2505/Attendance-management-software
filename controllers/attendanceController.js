@@ -227,11 +227,59 @@ const deleteAttendance = async (req, res) => {
   }
 };
 
+// @desc    Get attendance trends (aggregated by date) typically for charts
+// @route   GET /api/attendance/trends
+// @access  Private
+const getAttendanceTrends = async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+    startDate.setHours(0, 0, 0, 0);
+
+    let matchQuery = { date: { $gte: startDate } };
+
+    // Teacher isolation check
+    if (req.user.role === 'teacher') {
+      const myBatches = await Batch.find({ teacherId: req.user.id }).select('_id');
+      matchQuery.batchId = { $in: myBatches.map(b => b._id) };
+    }
+
+    const trends = await Attendance.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
+          total: { $sum: 1 },
+          present: {
+            $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] }
+          }
+        }
+      },
+      { $sort: { _id: 1 } },
+      {
+        $project: {
+          date: '$_id',
+          total: 1,
+          present: 1,
+          _id: 0
+        }
+      }
+    ]);
+
+    res.status(200).json(trends);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   markAttendance,
   markAllPresent,
   getAttendance,
   getAttendanceByStudent,
   updateAttendance,
-  deleteAttendance
+  deleteAttendance,
+  getAttendanceTrends
 };
