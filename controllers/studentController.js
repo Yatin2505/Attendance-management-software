@@ -5,7 +5,6 @@ const Attendance = require('../models/Attendance');
 const User = require('../models/User');
 const { notifyAdmins } = require('./notificationController');
 const bcrypt = require('bcryptjs');
-const mongoose = require('mongoose');
 
 // @desc    Create a new student
 // @route   POST /api/students
