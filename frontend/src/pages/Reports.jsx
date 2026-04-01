@@ -1,557 +1,735 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getBatches } from '../services/batchService';
 import { getStudents } from '../services/studentService';
-import { getBatchReport, getDateRangeReport, getStudentReport } from '../services/reportService';
+import {
+  getBatchReport, getDateRangeReport,
+  getStudentReport, getMonthlyReport
+} from '../services/reportService';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, Area, AreaChart
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell,
+  AreaChart, Area, Legend
 } from 'recharts';
-import { 
-  BarChart3, PieChart as PieChartIcon, Calendar, Users, FileText, Download, 
-  TrendingUp, Award, UserCheck, UserX, Clock, Filter, Activity
+import {
+  BarChart3, PieChart as PieIcon, Calendar, Users, FileText,
+  Download, TrendingUp, TrendingDown, UserCheck, UserX, Clock,
+  Filter, Activity, ChevronDown, ChevronUp, ChevronsUpDown,
+  Search, Layers, GraduationCap, AlertCircle, RefreshCw
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
-// Custom Recharts Tooltip for Neon Glass Theme
-const CustomTooltip = ({ active, payload, label }) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="glass-panel p-4 rounded-xl border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-xl">
-        <p className="font-bold text-slate-800 dark:text-white mb-2">{label}</p>
-        {payload.map((entry, index) => (
-          <div key={index} className="flex items-center gap-2 text-sm font-medium">
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }}></span>
-            <span className="text-slate-600 dark:text-slate-300">{entry.name}:</span>
-            <span className="text-slate-900 dark:text-white font-bold">{entry.value}{entry.name.includes('%') ? '%' : ''}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return null;
+// ─── Theme colors ────────────────────────────────────────────────────────────
+const GREEN = '#10b981';
+const RED   = '#f43f5e';
+const AMBER = '#f59e0b';
+const INDIGO= '#6366f1';
+
+// ─── Percentage badge ─────────────────────────────────────────────────────────
+const PctBadge = ({ pct }) => {
+  const color = pct >= 75
+    ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30'
+    : pct >= 60
+    ? 'bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-400 border-amber-200 dark:border-amber-500/30'
+    : 'bg-rose-100 dark:bg-rose-500/15 text-rose-800 dark:text-rose-400 border-rose-200 dark:border-rose-500/30';
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-bold border ${color}`}>
+      {pct}%
+    </span>
+  );
 };
 
-const Reports = () => {
-  const [reportType, setReportType] = useState('batch'); // 'batch', 'range', 'student'
-  
-  // Filters state
-  const [batches, setBatches] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [selectedBatchId, setSelectedBatchId] = useState('');
-  const [selectedStudentId, setSelectedStudentId] = useState('');
-  const [fromDate, setFromDate] = useState(new Date(new Date().setDate(1)).toISOString().split('T')[0]); // First of month
-  const [toDate, setToDate] = useState(new Date().toISOString().split('T')[0]); // Today
-  
-  // Data state
-  const [loading, setLoading] = useState(false);
-  const [reportData, setReportData] = useState(null); // structure varies freely based on type
+// ─── Custom chart tooltip ─────────────────────────────────────────────────────
+const ChartTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg px-3 py-2 text-xs font-semibold">
+      <p className="text-slate-500 dark:text-slate-400 mb-1 max-w-[160px] truncate">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} style={{ color: p.color }} className="font-bold">
+          {p.name}: {p.value}{p.name.includes('%') ? '' : ''}
+        </p>
+      ))}
+    </div>
+  );
+};
 
+// ─── Sortable table header ────────────────────────────────────────────────────
+const SortTh = ({ label, sortKey, sortState, onSort, className = '' }) => {
+  const [key, dir] = sortState;
+  const active = key === sortKey;
+  return (
+    <th
+      className={`py-3 px-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 cursor-pointer select-none hover:text-slate-800 dark:hover:text-white transition-colors whitespace-nowrap ${className}`}
+      onClick={() => onSort(sortKey)}
+    >
+      <span className="flex items-center gap-1">
+        {label}
+        {active
+          ? (dir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)
+          : <ChevronsUpDown className="w-3 h-3 opacity-30" />}
+      </span>
+    </th>
+  );
+};
+
+// ─── Empty state ──────────────────────────────────────────────────────────────
+const EmptyState = ({ icon: Icon, title, sub }) => (
+  <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400 dark:text-slate-600">
+    <Icon className="w-12 h-12 opacity-30" />
+    <p className="text-base font-semibold text-slate-600 dark:text-slate-400">{title}</p>
+    {sub && <p className="text-sm">{sub}</p>}
+  </div>
+);
+
+// ─── Stat summary strip ───────────────────────────────────────────────────────
+const StatStrip = ({ items }) => (
+  <div className="flex flex-wrap gap-3">
+    {items.map(({ label, value, color }) => (
+      <div key={label} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl px-4 py-2.5">
+        <span className={`text-xl font-display font-bold ${color}`}>{value}</span>
+        <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide">{label}</span>
+      </div>
+    ))}
+  </div>
+);
+
+// ─── Excel export helper ──────────────────────────────────────────────────────
+const exportToExcel = (rows, headers, filename) => {
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Report');
+  XLSX.writeFile(wb, `${filename}.xlsx`);
+};
+
+// ─── Report types config ──────────────────────────────────────────────────────
+const REPORT_TYPES = [
+  { value: 'batch',   label: 'Batch-wise',    icon: Layers },
+  { value: 'monthly', label: 'Monthly',        icon: Calendar },
+  { value: 'range',   label: 'Date Range',     icon: Clock },
+  { value: 'student', label: 'Student-wise',   icon: GraduationCap },
+];
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+const Reports = () => {
+  const today        = new Date().toISOString().split('T')[0];
+  const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+    .toISOString().split('T')[0];
+
+  const [reportType, setReportType] = useState('batch');
+  const [batches,     setBatches]   = useState([]);
+  const [students,    setStudents]  = useState([]);
+  const [selBatchId,  setSelBatchId]  = useState('');
+  const [selStudentId,setSelStudentId]= useState('');
+  const [fromDate,    setFromDate]  = useState(firstOfMonth);
+  const [toDate,      setToDate]    = useState(today);
+  const [month,       setMonth]     = useState(String(new Date().getMonth() + 1).padStart(2, '0'));
+  const [year,        setYear]      = useState(String(new Date().getFullYear()));
+
+  const [loading,     setLoading]   = useState(false);
+  const [reportData,  setReportData]= useState(null);
+  const [search,      setSearch]    = useState('');
+  const [sort,        setSort]      = useState(['name', 'asc']); // [key, dir]
+
+  // ── Initial load ────────────────────────────────────────────────────────────
   useEffect(() => {
-    fetchInitialData();
+    Promise.all([getBatches(), getStudents()])
+      .then(([b, s]) => { setBatches(b); setStudents(s); })
+      .catch(() => toast.error('Failed to load filter data'));
   }, []);
 
-  const fetchInitialData = async () => {
-    try {
-      const [batchesData, studentsData] = await Promise.all([
-        getBatches(),
-        getStudents()
-      ]);
-      setBatches(batchesData);
-      setStudents(studentsData);
-    } catch (error) {
-      toast.error('Failed to load filter data');
-    }
-  };
+  // ── Reset data when type changes ─────────────────────────────────────────────
+  useEffect(() => {
+    setReportData(null);
+    setSearch('');
+    setSort(['name', 'asc']);
+  }, [reportType]);
 
-  const handleGenerateReport = async () => {
+  // ── Generate ────────────────────────────────────────────────────────────────
+  const handleGenerate = async () => {
     setLoading(true);
     setReportData(null);
     try {
+      let data;
       if (reportType === 'batch') {
-        if (!selectedBatchId) return toast.error('Please select a batch');
-        const data = await getBatchReport(selectedBatchId);
-        setReportData(data);
+        if (!selBatchId) { toast.error('Please select a batch'); return; }
+        data = await getBatchReport(selBatchId);
+      } else if (reportType === 'monthly') {
+        data = await getMonthlyReport(parseInt(month, 10), year, selBatchId || undefined);
       } else if (reportType === 'range') {
-        if (!fromDate || !toDate) return toast.error('Please select date range');
-        const data = await getDateRangeReport(fromDate, toDate, selectedBatchId);
-        setReportData(data);
+        if (!fromDate || !toDate) { toast.error('Please select date range'); return; }
+        data = await getDateRangeReport(fromDate, toDate, selBatchId || undefined);
       } else if (reportType === 'student') {
-        if (!selectedStudentId) return toast.error('Please select a student');
-        const data = await getStudentReport(selectedStudentId);
-        setReportData(data);
+        if (!selStudentId) { toast.error('Please select a student'); return; }
+        data = await getStudentReport(selStudentId);
       }
-      toast.success('Report generated successfully');
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to generate report');
+      setReportData(data);
+      toast.success('Report ready');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to generate report');
     } finally {
       setLoading(false);
     }
   };
 
-  const downloadCSV = () => {
-    if (!reportData) return;
-
-    let headers = [];
-    let rows = [];
-    let filename = 'report.csv';
-
-    if (reportType === 'batch' || reportType === 'range') {
-      const arr = reportType === 'batch' ? reportData.studentsReport : reportData.data;
-      if (!arr || arr.length === 0) return toast('No data to export', { icon: 'ℹ️' });
-
-      headers = ['Roll Number', 'Name', 'Total Days', 'Present Days', 'Attendance %'];
-      rows = arr.map(item => [
-        item.rollNumber,
-        item.name,
-        item.totalDays,
-        item.presentDays,
-        item.percentage
-      ]);
-      filename = reportType === 'batch' ? `batch_report_${reportData.batch?.name || 'export'}.csv` : `range_report_${fromDate}_to_${toDate}.csv`;
-    } else if (reportType === 'student') {
-      headers = ['Student Name', 'Roll Number', 'Total Days', 'Present Days', 'Absent Days', 'Attendance %'];
-      rows = [[
-        reportData.student.name,
-        reportData.student.rollNumber,
-        reportData.stats.totalDays,
-        reportData.stats.presentDays,
-        reportData.stats.absentDays,
-        reportData.stats.percentage
-      ]];
-      filename = `student_report_${reportData.student.rollNumber}.csv`;
-    }
-
-    const csvContent = "data:text/csv;charset=utf-8," 
-        + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // ── Sorting helper ──────────────────────────────────────────────────────────
+  const handleSort = (key) => {
+    setSort(prev => prev[0] === key
+      ? [key, prev[1] === 'asc' ? 'desc' : 'asc']
+      : [key, 'asc']
+    );
   };
 
-  // Chart Colors (Neon Glass Theme)
-  const COLORS = ['#10B981', '#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6'];
-  const gradientId = "colorPercentage";
+  // ── Derive table rows (with search + sort) ──────────────────────────────────
+  const tableRows = useMemo(() => {
+    let raw = [];
+    if (!reportData) return raw;
 
+    if (reportType === 'batch')   raw = reportData.studentsReport ?? [];
+    if (reportType === 'monthly') raw = reportData.data ?? [];
+    if (reportType === 'range')   raw = reportData.data ?? [];
+    if (reportType === 'student') raw = reportData.batchReports ?? [];
+
+    // Search filter
+    const q = search.toLowerCase().trim();
+    if (q) {
+      raw = raw.filter(r =>
+        (r.name        ?? r.batchName ?? '').toLowerCase().includes(q) ||
+        (r.rollNumber  ?? '').toLowerCase().includes(q) ||
+        (r.batchName   ?? '').toLowerCase().includes(q)
+      );
+    }
+
+    // Sort
+    const [key, dir] = sort;
+    raw = [...raw].sort((a, b) => {
+      const av = a[key] ?? a['batchName'] ?? '';
+      const bv = b[key] ?? b['batchName'] ?? '';
+      if (typeof av === 'number') return dir === 'asc' ? av - bv : bv - av;
+      return dir === 'asc'
+        ? String(av).localeCompare(String(bv))
+        : String(bv).localeCompare(String(av));
+    });
+
+    return raw;
+  }, [reportData, reportType, search, sort]);
+
+  // ── Aggregate stats ─────────────────────────────────────────────────────────
+  const stats = useMemo(() => {
+    if (!reportData) return null;
+    if (reportType === 'student') {
+      const s = reportData.stats;
+      return {
+        total:   s.totalDays,
+        present: s.presentDays,
+        absent:  s.absentDays,
+        pct:     s.percentage,
+      };
+    }
+    const rows = tableRows;
+    const total   = rows.reduce((a, r) => a + (r.totalDays   ?? 0), 0);
+    const present = rows.reduce((a, r) => a + (r.presentDays ?? 0), 0);
+    return {
+      total,
+      present,
+      absent: total - present,
+      pct:    total > 0 ? Math.round((present / total) * 100) : 0,
+    };
+  }, [reportData, reportType, tableRows]);
+
+  // ── Excel export ────────────────────────────────────────────────────────────
+  const handleExport = () => {
+    if (!reportData) return;
+    let headers, rows, filename;
+
+    if (reportType === 'student') {
+      const s = reportData.stats;
+      const st = reportData.student;
+      headers = ['Name', 'Roll Number', 'Total Days', 'Present Days', 'Absent Days', 'Attendance %'];
+      rows = reportData.batchReports.map(r => [
+        st?.name, st?.rollNumber, r.totalDays, r.presentDays, r.absentDays, r.percentage
+      ]);
+      if (!rows.length) rows = [[st?.name, st?.rollNumber, s.totalDays, s.presentDays, s.absentDays, s.percentage]];
+      filename = `student_report_${st?.rollNumber ?? 'export'}`;
+    } else {
+      headers = ['Name', 'Roll Number', 'Total Days', 'Present Days', 'Absent Days', 'Attendance %'];
+      rows = tableRows.map(r => [
+        r.name ?? r.batchName ?? '',
+        r.rollNumber ?? '',
+        r.totalDays ?? 0,
+        r.presentDays ?? 0,
+        (r.totalDays ?? 0) - (r.presentDays ?? 0),
+        r.percentage ?? 0,
+      ]);
+      filename = reportType === 'batch'
+        ? `batch_report_${reportData.batch?.name ?? 'export'}`
+        : reportType === 'monthly'
+        ? `monthly_report_${year}_${month}`
+        : `range_report_${fromDate}_to_${toDate}`;
+    }
+
+    exportToExcel(rows, headers, filename);
+    toast.success('Excel file downloaded!');
+  };
+
+  // ── Chart data ──────────────────────────────────────────────────────────────
+  const barChartData = useMemo(() => {
+    if (reportType === 'student') {
+      return (reportData?.batchReports ?? []).map(r => ({
+        name: r.batchName,
+        'Attendance %': r.percentage,
+      }));
+    }
+    return tableRows.slice(0, 20).map(r => ({
+      name: (r.name ?? r.batchName ?? '').split(' ')[0],       // first word for narrow bars
+      fullName: r.name ?? r.batchName ?? '',
+      'Attendance %': r.percentage,
+    }));
+  }, [tableRows, reportType, reportData]);
+
+  const pieData = useMemo(() => {
+    if (!stats) return [];
+    return [
+      { name: 'Present', value: stats.present },
+      { name: 'Absent',  value: stats.absent  },
+    ];
+  }, [stats]);
+
+  // ── Years list for monthly ──────────────────────────────────────────────────
+  const yearOptions = useMemo(() => {
+    const y = new Date().getFullYear();
+    return [y - 2, y - 1, y, y + 1].map(String);
+  }, []);
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="h-full flex flex-col pb-6">
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-3 mb-8"
-      >
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-lg shadow-primary-500/30">
-          <Activity className="w-6 h-6 text-white" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-display font-bold text-slate-900 dark:text-white tracking-tight">Analytics & Reports</h1>
-          <p className="text-slate-500 dark:text-slate-400 font-medium">Generate comprehensive insights and track performance</p>
-        </div>
+    <div className="flex flex-col gap-5 pb-6">
+
+      {/* ── Page header ─────────────────────────────────────────────────────── */}
+      <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}>
+        <h1 className="text-2xl font-display font-bold text-slate-900 dark:text-white">Reports</h1>
+        <p className="text-sm text-slate-400 dark:text-slate-500 font-medium mt-0.5">
+          Attendance analytics across batches, students, and time periods
+        </p>
       </motion.div>
 
-      {/* Filter Configuration Panel */}
-      <motion.div 
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="glass-panel p-6 rounded-3xl mb-8 relative overflow-hidden"
+      {/* ── Filter panel ────────────────────────────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="premium-card p-5"
       >
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
-        
-        <div className="flex flex-col xl:flex-row gap-6 items-end relative z-10">
-          {/* Report Type Selector */}
-          <div className="w-full xl:w-1/4">
-            <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">
-              <Filter className="w-4 h-4 text-primary-500" />
-              Report Type
-            </label>
-            <div className="relative">
-              <select
-                value={reportType}
-                onChange={(e) => {
-                  setReportType(e.target.value);
-                  setReportData(null);
-                }}
-                className="block w-full pl-4 pr-10 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all shadow-sm font-medium appearance-none"
-              >
-                <option value="batch">Batch-wise Report</option>
-                <option value="range">Date Range Report</option>
-                <option value="student">Individual Student Report</option>
-              </select>
-              <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Dynamic Filters */}
-          <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {(reportType === 'batch' || reportType === 'range') && (
-              <div className="w-full">
-                <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">
-                  <Users className="w-4 h-4 text-primary-500" />
-                  {reportType === 'range' ? 'Cohort (Optional)' : 'Select Cohort'}
-                </label>
-                <div className="relative">
-                  <select
-                    value={selectedBatchId}
-                    onChange={(e) => setSelectedBatchId(e.target.value)}
-                    className="block w-full pl-4 pr-10 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all shadow-sm font-medium appearance-none"
-                  >
-                    <option value="">{reportType === 'range' ? 'All Cohorts' : '-- Select Cohort --'}</option>
-                    {batches.map(b => (
-                      <option key={b._id} value={b._id}>{b.name}</option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                    <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {reportType === 'range' && (
-              <>
-                <div className="w-full">
-                  <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">
-                    <Calendar className="w-4 h-4 text-primary-500" />
-                    From Date
-                  </label>
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="block w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all shadow-sm font-medium"
-                  />
-                </div>
-                <div className="w-full">
-                  <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">
-                    <Clock className="w-4 h-4 text-primary-500" />
-                    To Date
-                  </label>
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="block w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all shadow-sm font-medium"
-                  />
-                </div>
-              </>
-            )}
-
-            {reportType === 'student' && (
-              <div className="w-full md:col-span-2">
-                <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">
-                  <UserCheck className="w-4 h-4 text-primary-500" />
-                  Select Student
-                </label>
-                <div className="relative">
-                  <select
-                    value={selectedStudentId}
-                    onChange={(e) => setSelectedStudentId(e.target.value)}
-                    className="block w-full pl-4 pr-10 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all shadow-sm font-medium appearance-none"
-                  >
-                    <option value="">-- Choose Student --</option>
-                    {students.map(s => (
-                      <option key={s._id} value={s._id}>{s.name} ({s.rollNumber})</option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                    <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Generate Button */}
-          <div className="w-full xl:w-auto">
+        {/* Report type tabs */}
+        <div className="flex flex-wrap gap-2 mb-5">
+          {REPORT_TYPES.map(({ value, label, icon: Icon }) => (
             <button
-              onClick={handleGenerateReport}
-              disabled={loading}
-              className="w-full xl:w-40 px-6 py-3.5 bg-gradient-to-r from-primary-600 to-accent-600 text-white font-bold rounded-2xl hover:shadow-lg hover:shadow-primary-500/30 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap"
+              key={value}
+              id={`report-tab-${value}`}
+              onClick={() => setReportType(value)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all
+                ${reportType === value
+                  ? 'bg-primary-600 text-white shadow-sm shadow-primary-500/30'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
             >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              ) : (
-                <>
-                  <BarChart3 className="w-5 h-5" />
-                  Generate
-                </>
-              )}
+              <Icon className="w-4 h-4" /> {label}
             </button>
-          </div>
+          ))}
         </div>
-      </motion.div>
 
-      {/* Results Section */}
-      <AnimatePresence mode="wait">
-        <motion.div 
-          key={reportData ? 'results' : 'empty'}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          className="flex-1 flex flex-col space-y-6"
-        >
-          {!reportData && !loading && (
-            <div className="premium-card flex-1 flex flex-col items-center justify-center p-12 rounded-3xl min-h-[400px]">
-              <div className="w-32 h-32 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-6 shadow-inner border border-slate-100 dark:border-slate-800">
-                <PieChartIcon className="w-16 h-16 text-slate-300 dark:text-slate-600" />
-              </div>
-              <h2 className="text-2xl font-display font-bold text-slate-800 dark:text-white mb-2">Ready for Analytics</h2>
-              <p className="text-slate-500 dark:text-slate-400 text-lg font-medium text-center max-w-md">Configure your parameters above and click Generate to visualize attendance data.</p>
-            </div>
-          )}
+        {/* Filters row */}
+        <div className="flex flex-wrap items-end gap-3">
 
-          {loading && (
-            <div className="premium-card flex-1 flex flex-col justify-center items-center p-12 rounded-3xl min-h-[400px]">
+          {/* Batch select — for batch, monthly, range */}
+          {['batch', 'monthly', 'range'].includes(reportType) && (
+            <div className="flex flex-col gap-1.5 min-w-[180px] flex-1">
+              <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5" />
+                {reportType === 'batch' ? 'Batch *' : 'Batch (optional)'}
+              </label>
               <div className="relative">
-                <div className="w-20 h-20 border-4 border-primary-100 dark:border-slate-700 rounded-full"></div>
-                <div className="w-20 h-20 border-4 border-primary-500 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Activity className="w-8 h-8 text-primary-500 animate-pulse" />
-                </div>
+                <select
+                  id="filter-batch"
+                  value={selBatchId}
+                  onChange={e => setSelBatchId(e.target.value)}
+                  className="w-full pl-3 pr-8 py-2.5 rounded-xl text-sm font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/40 appearance-none"
+                >
+                  <option value="">{reportType === 'batch' ? '— Select Batch —' : 'All Batches'}</option>
+                  {batches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
+                </select>
+                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               </div>
-              <p className="text-slate-500 dark:text-slate-400 font-bold tracking-widest uppercase mt-8 animate-pulse text-sm">Compiling Data...</p>
             </div>
           )}
 
-          {reportData && !loading && (
-            <>
-              {/* Report Header Action Bar */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 glass-panel p-5 rounded-2xl shadow-sm border border-slate-200/50 dark:border-slate-700/50">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-primary-50 dark:bg-primary-500/10 rounded-xl text-primary-600 dark:text-primary-400">
-                     <FileText className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-white leading-tight">
-                        {reportType === 'batch' && `Cohort Summary: ${reportData.batch?.name || 'Unknown'}`}
-                        {reportType === 'range' && `Date Range Analytics`}
-                        {reportType === 'student' && `Student Profile: ${reportData.student?.name}`}
-                    </h2>
-                    {reportType === 'range' && <p className="text-sm font-medium text-slate-500 mt-1">{fromDate} to {toDate}</p>}
-                    {reportType === 'student' && <p className="text-sm font-medium text-slate-500 mt-1">Roll Index: {reportData.student?.rollNumber}</p>}
-                  </div>
-                </div>
-                
-                <button 
-                    onClick={downloadCSV}
-                    className="w-full md:w-auto px-5 py-2.5 bg-slate-900 dark:bg-slate-700 text-white rounded-xl hover:bg-slate-800 dark:hover:bg-slate-600 hover:shadow-lg hover:shadow-slate-900/20 active:scale-95 transition-all font-bold text-sm flex items-center justify-center gap-2"
+          {/* Student select */}
+          {reportType === 'student' && (
+            <div className="flex flex-col gap-1.5 min-w-[200px] flex-1">
+              <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+                <GraduationCap className="w-3.5 h-3.5" /> Student *
+              </label>
+              <div className="relative">
+                <select
+                  id="filter-student"
+                  value={selStudentId}
+                  onChange={e => setSelStudentId(e.target.value)}
+                  className="w-full pl-3 pr-8 py-2.5 rounded-xl text-sm font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/40 appearance-none"
                 >
-                  <Download className="w-4 h-4" />
-                  Export CSV Report
-                </button>
+                  <option value="">— Select Student —</option>
+                  {students.map(s => (
+                    <option key={s._id} value={s._id}>{s.name} ({s.rollNumber})</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               </div>
+            </div>
+          )}
 
-              {/* Student Specific KPI Dashboard */}
-              {reportType === 'student' && reportData && (
-                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                   {/* Left Column KPIs */}
-                   <div className="lg:col-span-5 grid grid-cols-2 gap-4">
-                     <div className="col-span-2 premium-card p-6 flex items-center justify-between rounded-3xl relative overflow-hidden group">
-                       <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                       <div className="relative z-10">
-                         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Overall Reliability</p>
-                         <div className="flex items-baseline gap-2">
-                           <p className={`text-5xl font-display font-black tracking-tighter ${reportData.stats.percentage >= 75 ? 'text-green-500' : 'text-red-500'}`}>
-                             {reportData.stats.percentage}%
-                           </p>
-                           {reportData.stats.percentage >= 75 ? (
-                             <TrendingUp className="w-6 h-6 text-green-500" />
-                           ) : (
-                             <Activity className="w-6 h-6 text-red-500" />
-                           )}
-                         </div>
-                       </div>
-                       <div className="w-16 h-16 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-primary-500 shadow-sm relative z-10 border border-slate-100 dark:border-slate-700">
-                          <Award className="w-8 h-8" />
-                       </div>
-                     </div>
-                     
-                     <div className="premium-card p-6 rounded-3xl flex flex-col justify-between">
-                        <div>
-                          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Present</p>
-                          <p className="text-4xl font-display font-black text-slate-800 dark:text-white">{reportData.stats.presentDays}</p>
-                        </div>
-                        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800/50 flex items-center gap-2 text-green-600 dark:text-green-400 font-medium text-sm">
-                          <UserCheck className="w-4 h-4" /> Logged Days
-                        </div>
-                     </div>
-
-                     <div className="premium-card p-6 rounded-3xl flex flex-col justify-between">
-                        <div>
-                          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Absent</p>
-                          <p className="text-4xl font-display font-black text-slate-800 dark:text-white">{reportData.stats.absentDays}</p>
-                        </div>
-                        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800/50 flex items-center gap-2 text-red-600 dark:text-red-400 font-medium text-sm">
-                          <UserX className="w-4 h-4" /> Missed Days
-                        </div>
-                     </div>
-                   </div>
-
-                   {/* Right Column Pie Chart */}
-                   <div className="lg:col-span-7 premium-card p-6 rounded-3xl flex flex-col items-center justify-center min-h-[300px] relative">
-                      <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-6 self-start w-full">Attendance Distribution</h3>
-                      {reportData.stats.totalDays === 0 ? (
-                        <div className="flex flex-col items-center text-slate-400">
-                          <PieChartIcon className="w-12 h-12 mb-2 opacity-20" />
-                          <p className="font-medium">No recorded data</p>
-                        </div>
-                      ) : (
-                        <div className="w-full h-[250px]">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie
-                                data={[
-                                  { name: 'Present', value: reportData.stats.presentDays },
-                                  { name: 'Absent', value: reportData.stats.absentDays }
-                                ]}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={70}
-                                outerRadius={90}
-                                paddingAngle={8}
-                                dataKey="value"
-                                stroke="none"
-                                cornerRadius={6}
-                                label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
-                              >
-                                {['Present', 'Absent'].map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={COLORS[index]} />
-                                ))}
-                              </Pie>
-                              <RechartsTooltip content={<CustomTooltip />} />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </div>
-                      )}
-                      
-                      {/* Total overlay */}
-                      {reportData.stats.totalDays > 0 && (
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[calc(50%-10px)] flex flex-col items-center justify-center text-center pointer-events-none">
-                          <span className="text-xs font-bold text-slate-400 uppercase">Total</span>
-                          <span className="text-2xl font-black text-slate-800 dark:text-white">{reportData.stats.totalDays}</span>
-                        </div>
-                      )}
-                   </div>
-                 </div>
-              )}
-
-              {/* Batch / Range Charts Area */}
-              {((reportType === 'batch' && reportData.studentsReport?.length > 0) || 
-                (reportType === 'range' && reportData.data?.length > 0)) && (
-                <div className="premium-card p-6 rounded-3xl h-[400px]">
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Attendance Averages by Student</h3>
-                  </div>
-                  <ResponsiveContainer width="100%" height="100%" className="-ml-4">
-                    <RechartsBarChart 
-                      data={reportType === 'batch' ? reportData.studentsReport : reportData.data}
-                      margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
-                    >
-                      <defs>
-                        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.9}/>
-                          <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.6}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-slate-200 dark:text-slate-800" />
-                      <XAxis 
-                        dataKey="name" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
-                        dy={10}
-                      />
-                      <YAxis 
-                        domain={[0, 100]} 
-                        axisLine={false} 
-                        tickLine={false}
-                        tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
-                        dx={-10}
-                      />
-                      <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'currentColor', className: 'text-slate-100 dark:text-slate-800' }} />
-                      <Bar 
-                        dataKey="percentage" 
-                        name="Attendance %" 
-                        fill={`url(#${gradientId})`} 
-                        radius={[6, 6, 0, 0]} 
-                        barSize={32} 
-                      />
-                    </RechartsBarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              {/* Detailed Table for Batch / Range */}
-              {(reportType === 'batch' || reportType === 'range') && (
-                <div className="premium-card overflow-hidden flex-1 flex flex-col rounded-3xl border border-slate-200/50 dark:border-slate-800">
-                  <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
-                    <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider">Detailed Ledger</h3>
-                  </div>
-                  <div className="overflow-x-auto flex-1 custom-scrollbar">
-                    <table className="w-full text-left border-collapse min-w-[600px]">
-                      <thead className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
-                        <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-widest font-bold">
-                          <th className="py-5 px-6">Participant</th>
-                          <th className="py-5 px-6">ID Number</th>
-                          <th className="py-5 px-6 text-center">Total Sessions</th>
-                          <th className="py-5 px-6 text-center">Attended</th>
-                          <th className="py-5 px-6 text-right">Performance</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                        {(() => {
-                          const iterable = reportType === 'batch' ? reportData.studentsReport : reportData.data;
-                          if (!iterable || iterable.length === 0) {
-                            return (
-                              <tr>
-                                <td colSpan="5" className="py-12 text-center text-slate-500 dark:text-slate-400 font-medium bg-slate-50/30 dark:bg-transparent">
-                                  No ledger data available for the selected parameters.
-                                </td>
-                              </tr>
-                            );
-                          }
-                          return iterable.map((row, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                              <td className="py-4 px-6">
-                                <span className="font-bold text-slate-800 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">{row.name}</span>
-                              </td>
-                              <td className="py-4 px-6 text-slate-500 dark:text-slate-400 font-medium font-mono text-sm">{row.rollNumber}</td>
-                              <td className="py-4 px-6 text-center text-slate-700 dark:text-slate-300 font-medium">{row.totalDays}</td>
-                              <td className="py-4 px-6 text-center text-green-600 dark:text-green-400 font-bold">{row.presentDays}</td>
-                              <td className="py-4 px-6 text-right">
-                                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
-                                    row.percentage >= 75 
-                                      ? 'bg-green-100 dark:bg-green-500/20 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-500/30' 
-                                      : 'bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-400 border border-red-200 dark:border-red-500/30'
-                                 }`}>
-                                   {row.percentage}%
-                                 </span>
-                              </td>
-                            </tr>
-                          ))
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+          {/* Month + Year for monthly */}
+          {reportType === 'monthly' && (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Month</label>
+                <select
+                  id="filter-month"
+                  value={month}
+                  onChange={e => setMonth(e.target.value)}
+                  className="pl-3 pr-8 py-2.5 rounded-xl text-sm font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/40 appearance-none"
+                >
+                  {['January','February','March','April','May','June','July','August','September','October','November','December']
+                    .map((m, i) => <option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Year</label>
+                <select
+                  id="filter-year"
+                  value={year}
+                  onChange={e => setYear(e.target.value)}
+                  className="pl-3 pr-8 py-2.5 rounded-xl text-sm font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/40 appearance-none"
+                >
+                  {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
             </>
           )}
-        </motion.div>
+
+          {/* Date range */}
+          {reportType === 'range' && (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5" /> From
+                </label>
+                <input
+                  id="filter-from"
+                  type="date"
+                  value={fromDate}
+                  max={toDate}
+                  onChange={e => setFromDate(e.target.value)}
+                  className="px-3 py-2.5 rounded-xl text-sm font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5" /> To
+                </label>
+                <input
+                  id="filter-to"
+                  type="date"
+                  value={toDate}
+                  min={fromDate}
+                  max={today}
+                  onChange={e => setToDate(e.target.value)}
+                  className="px-3 py-2.5 rounded-xl text-sm font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+                />
+              </div>
+            </>
+          )}
+
+          {/* Generate button */}
+          <button
+            id="btn-generate"
+            onClick={handleGenerate}
+            disabled={loading}
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl text-sm transition-all active:scale-95 disabled:opacity-60 shadow-sm shadow-primary-500/20 whitespace-nowrap"
+          >
+            {loading
+              ? <RefreshCw className="w-4 h-4 animate-spin" />
+              : <BarChart3 className="w-4 h-4" />
+            }
+            {loading ? 'Generating…' : 'Generate'}
+          </button>
+        </div>
+      </motion.div>
+
+      {/* ── Results ─────────────────────────────────────────────────────────── */}
+      <AnimatePresence mode="wait">
+        {!reportData && !loading && (
+          <motion.div
+            key="empty"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="premium-card flex flex-col items-center justify-center py-20 gap-4"
+          >
+            <PieIcon className="w-14 h-14 text-slate-300 dark:text-slate-700" />
+            <p className="text-base font-semibold text-slate-600 dark:text-slate-400">
+              Configure filters above and click <strong>Generate</strong> to see your report
+            </p>
+          </motion.div>
+        )}
+
+        {loading && (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="premium-card flex flex-col items-center justify-center py-20 gap-4"
+          >
+            <div className="w-10 h-10 border-4 border-primary-200 dark:border-slate-700 border-t-primary-500 rounded-full animate-spin" />
+            <p className="text-sm font-semibold text-slate-400 dark:text-slate-500 tracking-widest uppercase">Compiling report…</p>
+          </motion.div>
+        )}
+
+        {reportData && !loading && (
+          <motion.div
+            key="results"
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col gap-5"
+          >
+            {/* ── Result header ──────────────────────────────────────────── */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 premium-card px-5 py-4">
+              <div>
+                <h2 className="text-base font-display font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-primary-500" />
+                  {reportType === 'batch'   && `Batch Report: ${reportData.batch?.name ?? ''}`}
+                  {reportType === 'monthly' && `Monthly Report — ${['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(month,10)]} ${year}`}
+                  {reportType === 'range'   && `Date Range: ${fromDate} → ${toDate}`}
+                  {reportType === 'student' && `Student: ${reportData.student?.name} (${reportData.student?.rollNumber})`}
+                </h2>
+                {stats && (
+                  <p className="text-xs text-slate-400 mt-0.5 font-medium">
+                    {tableRows.length} record{tableRows.length !== 1 ? 's' : ''} ·{' '}
+                    <span className={stats.pct >= 75 ? 'text-emerald-500' : stats.pct >= 60 ? 'text-amber-500' : 'text-rose-500'}>
+                      {stats.pct}% overall attendance
+                    </span>
+                  </p>
+                )}
+              </div>
+              <button
+                id="btn-export"
+                onClick={handleExport}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-500/20 active:scale-95 transition-all whitespace-nowrap"
+              >
+                <Download className="w-4 h-4" /> Export Excel
+              </button>
+            </div>
+
+            {/* ── Stat strip ─────────────────────────────────────────────── */}
+            {stats && (
+              <StatStrip items={[
+                { label: 'Total Sessions', value: stats.total,   color: 'text-slate-800 dark:text-white'   },
+                { label: 'Present',        value: stats.present, color: 'text-emerald-600 dark:text-emerald-400' },
+                { label: 'Absent',         value: stats.absent,  color: 'text-rose-600 dark:text-rose-400'  },
+                { label: 'Attendance %',   value: `${stats.pct}%`,
+                  color: stats.pct >= 75 ? 'text-emerald-600 dark:text-emerald-400'
+                       : stats.pct >= 60 ? 'text-amber-600 dark:text-amber-400'
+                       : 'text-rose-600 dark:text-rose-400'
+                },
+              ]} />
+            )}
+
+            {/* ── Charts ─────────────────────────────────────────────────── */}
+            <div className={`grid gap-5 ${reportType === 'student' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 lg:grid-cols-3'}`}>
+
+              {/* Bar chart */}
+              {barChartData.length > 0 && (
+                <div className={`premium-card p-5 ${reportType === 'student' ? '' : 'lg:col-span-2'}`}>
+                  <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4">
+                    Attendance % by {reportType === 'student' ? 'Batch' : 'Student'}
+                  </h3>
+                  <div className="h-56 -ml-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={barChartData} margin={{ top: 4, right: 4, left: -20, bottom: 4 }} barSize={24}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" strokeOpacity={0.6} />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false}
+                          tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} dy={6} />
+                        <YAxis domain={[0, 100]} axisLine={false} tickLine={false}
+                          tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={v => `${v}%`} />
+                        <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(99,102,241,0.06)' }} />
+                        <Bar dataKey="Attendance %" radius={[4, 4, 0, 0]}>
+                          {barChartData.map((entry, i) => (
+                            <Cell key={i} fill={
+                              (entry['Attendance %'] ?? 0) >= 75 ? GREEN
+                            : (entry['Attendance %'] ?? 0) >= 60 ? AMBER : RED
+                            } />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {/* Color legend */}
+                  <div className="flex items-center gap-4 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    {[['≥ 75%', GREEN], ['60–74%', AMBER], ['< 60%', RED]].map(([l, c]) => (
+                      <span key={l} className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                        <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: c }} />{l}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Pie chart — present vs absent */}
+              {stats && stats.total > 0 && (
+                <div className="premium-card p-5 flex flex-col">
+                  <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4">Distribution</h3>
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="h-52 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={pieData}
+                            cx="50%" cy="50%"
+                            innerRadius={60} outerRadius={80}
+                            paddingAngle={5} dataKey="value"
+                            stroke="none" cornerRadius={4}
+                          >
+                            <Cell fill={GREEN} />
+                            <Cell fill={RED}   />
+                          </Pie>
+                          <Tooltip content={<ChartTooltip />} />
+                          <Legend
+                            formatter={(v) => <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{v}</span>}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  {/* center label */}
+                  <p className="text-center text-sm font-bold mt-1">
+                    <span className={stats.pct >= 75 ? 'text-emerald-500' : stats.pct >= 60 ? 'text-amber-500' : 'text-rose-500'}>
+                      {stats.pct}%
+                    </span>
+                    <span className="text-slate-400 dark:text-slate-500 font-normal"> attendance rate</span>
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* ── Student batch breakdown (student report only) ───────────── */}
+            {reportType === 'student' && (reportData.batchReports?.length ?? 0) > 1 && (
+              <div className="premium-card p-5">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">Batch-wise Breakdown</h3>
+                <div className="flex flex-wrap gap-3">
+                  {reportData.batchReports.map((r, i) => (
+                    <div key={i} className="flex-1 min-w-[160px] bg-slate-50 dark:bg-slate-800/60 rounded-xl p-4 border border-slate-100 dark:border-slate-800">
+                      <p className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate mb-1">{r.batchName}</p>
+                      <p className="text-2xl font-display font-bold text-slate-900 dark:text-white">{r.percentage}%</p>
+                      <p className="text-xs text-slate-400 mt-1">{r.presentDays}/{r.totalDays} sessions</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Data table ──────────────────────────────────────────────── */}
+            <div className="premium-card overflow-hidden flex flex-col">
+              {/* Table toolbar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white">
+                  Detailed Data
+                  <span className="ml-2 text-xs font-normal text-slate-400">({tableRows.length} records)</span>
+                </h3>
+                <div className="relative w-full sm:w-56">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                  <input
+                    id="report-search"
+                    type="text"
+                    placeholder="Search name or roll…"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-2 rounded-xl text-xs font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+                  />
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                {tableRows.length === 0 ? (
+                  <EmptyState
+                    icon={AlertCircle}
+                    title="No records found"
+                    sub={search ? 'Try a different search term' : 'No attendance data for the selected parameters'}
+                  />
+                ) : (
+                  <table className="w-full text-left min-w-[540px]">
+                    <thead className="bg-white dark:bg-slate-900 sticky top-0 z-10">
+                      <tr className="border-b border-slate-100 dark:border-slate-800">
+                        <th className="py-3 px-4 text-xs font-bold uppercase tracking-wide text-slate-400 w-8">#</th>
+                        {reportType === 'student' ? (
+                          <SortTh label="Batch"        sortKey="batchName"   sortState={sort} onSort={handleSort} />
+                        ) : (
+                          <>
+                            <SortTh label="Name"       sortKey="name"        sortState={sort} onSort={handleSort} />
+                            <SortTh label="Roll No."   sortKey="rollNumber"  sortState={sort} onSort={handleSort} className="hidden sm:table-cell" />
+                          </>
+                        )}
+                        <SortTh label="Total"          sortKey="totalDays"   sortState={sort} onSort={handleSort} className="text-center" />
+                        <SortTh label="Present"        sortKey="presentDays" sortState={sort} onSort={handleSort} className="text-center" />
+                        <th className="py-3 px-4 text-xs font-bold uppercase tracking-wide text-slate-400 text-center">Absent</th>
+                        <SortTh label="Attendance %"   sortKey="percentage"  sortState={sort} onSort={handleSort} className="text-center" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                      {tableRows.map((row, idx) => {
+                        const absent = (row.totalDays ?? 0) - (row.presentDays ?? 0);
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                            <td className="py-3 px-4 text-xs text-slate-400 font-medium">{idx + 1}</td>
+                            {reportType === 'student' ? (
+                              <td className="py-3 px-4 text-sm font-semibold text-slate-800 dark:text-white">{row.batchName}</td>
+                            ) : (
+                              <>
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-7 h-7 rounded-lg bg-primary-50 dark:bg-primary-500/10 flex items-center justify-center text-xs font-bold text-primary-600 dark:text-primary-400 flex-shrink-0">
+                                      {(row.name ?? '?').charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="text-sm font-semibold text-slate-800 dark:text-white">{row.name}</span>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-xs font-mono text-slate-400 hidden sm:table-cell">{row.rollNumber ?? '—'}</td>
+                              </>
+                            )}
+                            <td className="py-3 px-4 text-sm text-center text-slate-600 dark:text-slate-300 font-medium">{row.totalDays ?? 0}</td>
+                            <td className="py-3 px-4 text-sm text-center font-bold text-emerald-600 dark:text-emerald-400">{row.presentDays ?? 0}</td>
+                            <td className="py-3 px-4 text-sm text-center font-bold text-rose-600 dark:text-rose-400">{absent}</td>
+                            <td className="py-3 px-4 text-center">
+                              <PctBadge pct={row.percentage ?? 0} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+
+                    {/* Table footer summary */}
+                    {tableRows.length > 1 && stats && (
+                      <tfoot>
+                        <tr className="bg-slate-50 dark:bg-slate-800/40 border-t-2 border-slate-200 dark:border-slate-700 font-bold text-sm">
+                          <td colSpan={reportType === 'student' ? 2 : 3} className="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wide">
+                            Total / Average
+                          </td>
+                          <td className="py-3 px-4 text-center text-slate-800 dark:text-white">{stats.total}</td>
+                          <td className="py-3 px-4 text-center text-emerald-600 dark:text-emerald-400">{stats.present}</td>
+                          <td className="py-3 px-4 text-center text-rose-600 dark:text-rose-400">{stats.absent}</td>
+                          <td className="py-3 px-4 text-center"><PctBadge pct={stats.pct} /></td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
