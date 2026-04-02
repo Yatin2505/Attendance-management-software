@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import Dashboard from './Dashboard';
 import TeacherDashboard from './TeacherDashboard';
 import StudentDashboard from './StudentDashboard';
+import ParentDashboard from './ParentDashboard';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -15,6 +16,10 @@ const Index = () => {
 
   if (user?.role === 'student') {
     return <StudentDashboard />;
+  }
+
+  if (user?.role === 'parent') {
+    return <ParentDashboard />;
   }
 
   return <Dashboard />;

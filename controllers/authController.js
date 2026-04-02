@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Student = require('../models/Student');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
@@ -14,11 +15,25 @@ const generateToken = (id) => {
 // @access  Public
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role, adminKey } = req.body;
+    const { name, email, password, role, adminKey, rollNumber } = req.body;
 
-    // Verify Super Admin permission key
-    if (adminKey !== process.env.ADMIN_REGISTRATION_KEY) {
-      return res.status(403).json({ message: 'Unauthorized: Invalid Registration Key' });
+    let studentId = null;
+    
+    // Role-based validation
+    if (role === 'student' || role === 'parent') {
+      if (!rollNumber) {
+        return res.status(400).json({ message: 'Roll number is required for students and parents' });
+      }
+      const student = await Student.findOne({ rollNumber });
+      if (!student) {
+        return res.status(404).json({ message: 'No student found with this roll number. Please check or contact admin.' });
+      }
+      studentId = student._id;
+    } else {
+      // Verify Super Admin permission key for admin/teacher
+      if (adminKey !== process.env.ADMIN_REGISTRATION_KEY) {
+        return res.status(403).json({ message: 'Unauthorized: Invalid Registration Key' });
+      }
     }
 
     // Check if user exists
@@ -36,7 +51,8 @@ const registerUser = async (req, res) => {
       name,
       email,
       password: hashedPassword,
-      role: role || 'admin'
+      role: role || 'admin',
+      studentId
     });
 
     if (user) {
@@ -45,6 +61,7 @@ const registerUser = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        studentId: user.studentId,
         token: generateToken(user._id)
       });
     } else {

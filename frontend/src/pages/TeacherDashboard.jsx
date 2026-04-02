@@ -45,86 +45,39 @@ const TeacherDashboard = () => {
     try {
       setLoading(true);
       
-      const [studentsData, batchesData, allAttendance, notificationsData] = await Promise.all([
-        getStudents(),
+      const [statsRes, batchesData, notificationsData] = await Promise.all([
+        getDashboardStats(),
         getBatches(),
-        getAttendance(),
         notificationService.getNotifications()
       ]);
+      
       setNotifications(notificationsData.notifications.slice(0, 4));
 
       const myBatchesData = batchesData.filter(b => b.teacherId === user._id || b.teacher === user._id);
-      setRecentBatches(myBatchesData.slice(0, 3)); // show max 3 batches
-
-      // For a teacher, getStudents should ideally return only their students (backend handled)
-      const totalStudents = studentsData.length;
-
-      // Estimate today's attendance for teacher's batches
-      const todayDate = new Date().toISOString().split('T')[0];
-      let presentToday = 0;
-      let leaveToday   = 0;
-      let totalTodayLogs = 0;
-
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const dateMap = {};
-
-      if (allAttendance && allAttendance.length > 0) {
-        allAttendance.forEach(record => {
-           const recDate = new Date(record.date);
-           const dayStr = recDate.toISOString().split('T')[0];
-           
-           if (dayStr === todayDate) {
-              totalTodayLogs += 1;
-              if (record.status === 'present' || record.status === 'late') presentToday += 1;
-              if (record.status === 'leave') leaveToday += 1;
-           }
-
-           if (recDate >= thirtyDaysAgo) {
-             if (!dateMap[dayStr]) {
-               dateMap[dayStr] = { total: 0, present: 0 };
-             }
-             dateMap[dayStr].total += 1;
-             if (record.status === 'present') {
-               dateMap[dayStr].present += 1;
-             }
-           }
-        });
-      }
-
-      const absentToday = totalTodayLogs - presentToday - leaveToday;
-      const denom = totalTodayLogs - leaveToday;
-      const pct = denom > 0 ? Math.round((presentToday / denom) * 100) : 0;
+      setRecentBatches(myBatchesData.slice(0, 3));
 
       setStats({
-        totalStudents,
-        myBatches: myBatchesData.length,
-        todayPresent: presentToday,
-        todayAbsent: absentToday,
-        todayLeave: leaveToday,
-        todayPercentage: pct
+        totalStudents: statsRes.counts.totalStudents,
+        myBatches: statsRes.counts.totalBatches,
+        todayPresent: statsRes.today.present,
+        todayAbsent: statsRes.today.absent,
+        todayLeave: statsRes.today.leave,
+        todayPercentage: statsRes.today.percentage
       });
 
-      const sortedDates = Object.keys(dateMap).sort();
-      const chartTimeseries = sortedDates.map(dateStr => {
-          const formatObj = new Date(dateStr);
-          const displayDate = formatObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-          const dayStats = dateMap[dateStr];
-          const denom = dayStats.total - dayStats.leave;
-          const percentage = denom > 0 ? Math.round((dayStats.present / denom) * 100) : 0;
-          return { 
-            name: displayDate, 
-            percentage, 
-            present: dayStats.present, 
-            absent: dayStats.total - dayStats.present - dayStats.leave,
-            leave: dayStats.leave
-          };
-      });
+      const chartTimeseries = statsRes.monthlyTrend.map(d => ({
+        name: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        percentage: d.percentage,
+        present: d.present,
+        absent: d.total - d.present - d.leave,
+        leave: d.leave
+      }));
 
       setChartData(chartTimeseries);
 
     } catch (error) {
       console.error("Teacher Dashboard data load error:", error);
+      toast.error("Failed to load dashboard statistics");
     } finally {
       setLoading(false);
     }

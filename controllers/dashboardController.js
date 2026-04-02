@@ -16,36 +16,57 @@ const toUTCMidnight = (dateInput) => {
 // @access  Private
 const getDashboardStats = async (req, res) => {
   try {
+    const { user } = req;
+    const isAdmin = user.role === 'admin';
+    const isTeacher = user.role === 'teacher';
+
     const today = toUTCMidnight(new Date());
     const tomorrow = new Date(today);
     tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
+    // -- Scope Filter --
+    let scopeFilter = {};
+    let teacherBatchIds = [];
+
+    if (isTeacher) {
+      const myBatches = await Batch.find({ teacherId: user._id }).select('_id');
+      teacherBatchIds = myBatches.map(b => b._id);
+      scopeFilter = { batchId: { $in: teacherBatchIds } };
+    }
+
     // -- Parallel queries for basic counts --
     const [
-      totalStudents,
-      totalBatches,
-      totalTeachers,
+      totalStudentsCount,
+      totalBatchesCount,
+      totalTeachersCount,
       todayRecords,
       recentActivity,
       feeAgg
     ] = await Promise.all([
-      Student.countDocuments(),
-      Batch.countDocuments(),
+      isTeacher 
+        ? Student.countDocuments({ batches: { $in: teacherBatchIds } })
+        : Student.countDocuments(),
+      isTeacher
+        ? Batch.countDocuments({ teacherId: user._id })
+        : Batch.countDocuments(),
       User.countDocuments({ role: 'teacher' }),
       // Today's attendance records
-      Attendance.find({ date: { $gte: today, $lt: tomorrow } })
+      Attendance.find({ 
+        date: { $gte: today, $lt: tomorrow },
+        ...(isTeacher ? scopeFilter : {})
+      })
         .populate('studentId', 'name rollNumber')
         .populate('batchId', 'name')
         .lean(),
       // Last 5 attendance records (any date)
-      Attendance.find()
+      Attendance.find(isTeacher ? scopeFilter : {})
         .sort({ createdAt: -1 })
         .limit(5)
         .populate('studentId', 'name rollNumber')
         .populate('batchId', 'name')
         .lean(),
-      // Fee stats
-      Fee.aggregate([
+      // Fee stats (Admins only)
+      isAdmin ? Fee.aggregate([
         {
           $group: {
             _id: null,
@@ -53,7 +74,7 @@ const getDashboardStats = async (req, res) => {
             totalPaid:   { $sum: '$paidAmount' }
           }
         }
-      ])
+      ]) : Promise.resolve([])
     ]);
 
     const feeTotals = (feeAgg && feeAgg[0]) || { totalAmount: 0, totalPaid: 0 };
@@ -67,8 +88,9 @@ const getDashboardStats = async (req, res) => {
     const todayDenom   = todayTotal - todayLeave;
     const todayPercentage = todayDenom > 0 ? Math.round(((todayPresent + todayLate) / todayDenom) * 100) : 0;
 
-    // -- Overall attendance percentage (all time) --
+    // -- Overall attendance percentage --
     const overallAgg = await Attendance.aggregate([
+      { $match: isTeacher ? scopeFilter : {} },
       {
         $group: {
           _id: null,
@@ -84,13 +106,18 @@ const getDashboardStats = async (req, res) => {
     const overallDenom   = overallTotal - overallLeave;
     const overallPercentage = overallDenom > 0 ? Math.round((overallPresent / overallDenom) * 100) : 0;
 
-    // -- Monthly attendance trend (last 30 days, grouped by day) --
+    // -- Monthly attendance trend (last 30 days) --
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
     thirtyDaysAgo.setHours(0, 0, 0, 0);
 
     const monthlyTrend = await Attendance.aggregate([
-      { $match: { date: { $gte: thirtyDaysAgo } } },
+      { 
+        $match: { 
+          date: { $gte: thirtyDaysAgo },
+          ...(isTeacher ? scopeFilter : {})
+        } 
+      },
       {
         $group: {
           _id: { $dateToString: { format: '%Y-%m-%d', date: '$date' } },
@@ -118,8 +145,9 @@ const getDashboardStats = async (req, res) => {
       }
     ]);
 
-    // -- Batch-wise attendance (all time) --
+    // -- Batch-wise attendance --
     const batchWise = await Attendance.aggregate([
+      { $match: isTeacher ? scopeFilter : {} },
       {
         $group: {
           _id: '$batchId',
@@ -167,9 +195,9 @@ const getDashboardStats = async (req, res) => {
 
     res.status(200).json({
       counts: {
-        totalStudents,
-        totalBatches,
-        totalTeachers
+        totalStudents: totalStudentsCount,
+        totalBatches: totalBatchesCount,
+        totalTeachers: totalTeachersCount
       },
       today: {
         present: todayPresent,
@@ -187,10 +215,10 @@ const getDashboardStats = async (req, res) => {
       monthlyTrend,
       batchWise,
       recentActivity: activity,
-      fees: {
+      fees: isAdmin ? {
         totalCollected: feeTotals.totalPaid,
         totalPending:   feeTotals.totalAmount - feeTotals.totalPaid
-      }
+      } : null
     });
   } catch (error) {
     console.error('Dashboard error:', error);

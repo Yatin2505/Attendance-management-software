@@ -9,8 +9,8 @@ export const loginUser = async (email, password) => {
   return response.data;
 };
 
-export const registerUser = async (name, email, password) => {
-  const response = await api.post('/auth/register', { name, email, password });
+export const registerUser = async (userData) => {
+  const response = await api.post('/auth/register', userData);
   if (response.data.token) {
     localStorage.setItem('token', response.data.token);
     localStorage.setItem('user', JSON.stringify(response.data));

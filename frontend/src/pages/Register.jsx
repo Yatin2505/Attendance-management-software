@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import { registerUser } from '../services/authService';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { Mail, Lock, User, Key, UserPlus } from 'lucide-react';
@@ -10,7 +10,9 @@ const Register = () => {
     name: '',
     email: '',
     password: '',
-    adminKey: ''
+    role: 'student',
+    adminKey: '',
+    rollNumber: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   
@@ -24,7 +26,7 @@ const Register = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await axios.post((import.meta.env.VITE_API_URL || 'http://localhost:5000/api') + '/auth/register', formData);
+      await registerUser(formData);
       toast.success('Registration successful! Please login.');
       navigate('/login');
     } catch (error) {
@@ -33,6 +35,13 @@ const Register = () => {
       setIsLoading(false);
     }
   };
+
+  const roles = [
+    { id: 'student', label: 'Student', icon: User },
+    { id: 'parent', label: 'Parent', icon: User },
+    { id: 'teacher', label: 'Teacher', icon: Key },
+    { id: 'admin', label: 'Admin', icon: Lock },
+  ];
 
   return (
     <div className="min-h-screen flex bg-slate-950 font-sans overflow-hidden">
@@ -60,11 +69,11 @@ const Register = () => {
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }}>
             <h2 className="text-6xl font-display font-bold text-white leading-tight mb-6">
-              Join the <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 to-accent-400">avant-garde.</span>
+              Empowering <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 to-accent-400">Education.</span>
             </h2>
             <p className="text-xl text-slate-400 max-w-lg font-light leading-relaxed">
-              Create an administrative account to deploy modern infrastructure for your educational institution.
+              Create your account to access the modern attendance and fee management portal.
             </p>
           </motion.div>
         </div>
@@ -85,86 +94,117 @@ const Register = () => {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5 }}
-          className="w-full max-w-md premium-card p-10 lg:p-12"
+          className="w-full max-w-md premium-card p-10 lg:p-12 overflow-y-auto max-h-[90vh] custom-scrollbar"
         >
-          <div className="text-center mb-10">
+          <div className="text-center mb-8">
             <h2 className="text-3xl font-display font-bold text-slate-900 dark:text-white mb-3">Get Started</h2>
-            <p className="text-slate-500 dark:text-slate-400">Create an administrator account.</p>
+            <p className="text-slate-500 dark:text-slate-400">Join your institution portal.</p>
           </div>
 
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div className="space-y-5">
+          {/* Role Selector */}
+          <div className="grid grid-cols-4 gap-2 mb-8 p-1 bg-slate-100 dark:bg-white/5 rounded-2xl">
+            {roles.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => setFormData({ ...formData, role: r.id })}
+                className={`flex flex-col items-center gap-1.5 py-2.5 rounded-xl transition-all duration-200 ${
+                  formData.role === r.id 
+                    ? 'bg-white dark:bg-white/10 text-primary-600 dark:text-primary-400 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                <r.icon className={`w-4 h-4 ${formData.role === r.id ? 'animate-pulse' : ''}`} />
+                <span className="text-[10px] font-bold uppercase tracking-wider">{r.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <form className="space-y-5" onSubmit={handleSubmit}>
+            <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Full Name</label>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Full Name</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <User className="h-5 w-5 text-slate-400" />
                   </div>
                   <input
-                    name="name"
-                    type="text"
-                    required
-                    className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all font-medium"
+                    name="name" type="text" required
+                    className="block w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all font-medium"
                     placeholder="John Doe"
-                    value={formData.name}
-                    onChange={handleChange}
+                    value={formData.name} onChange={handleChange}
                   />
                 </div>
               </div>
               
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Email address</label>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Email address</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <Mail className="h-5 w-5 text-slate-400" />
                   </div>
                   <input
-                    name="email"
-                    type="email"
-                    required
-                    className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all font-medium"
-                    placeholder="admin@example.com"
-                    value={formData.email}
-                    onChange={handleChange}
+                    name="email" type="email" required
+                    className="block w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all font-medium"
+                    placeholder="john@example.com"
+                    value={formData.email} onChange={handleChange}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Password</label>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Password</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <Lock className="h-5 w-5 text-slate-400" />
                   </div>
                   <input
-                    name="password"
-                    type="password"
-                    required
-                    className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all font-medium"
+                    name="password" type="password" required
+                    className="block w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all font-medium"
                     placeholder="••••••••"
-                    value={formData.password}
-                    onChange={handleChange}
+                    value={formData.password} onChange={handleChange}
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Registration Key <span className="text-red-500">*</span></label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Key className="h-5 w-5 text-accent-500" />
+              {(formData.role === 'student' || formData.role === 'parent') && (
+                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Student Roll Number <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <Key className="h-5 w-5 text-amber-500" />
+                    </div>
+                    <input
+                      name="rollNumber" type="text" required
+                      className="block w-full pl-11 pr-4 py-3 bg-amber-50/50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all font-medium"
+                      placeholder="e.g. ROLL123"
+                      value={formData.rollNumber} onChange={handleChange}
+                    />
                   </div>
-                  <input
-                    name="adminKey"
-                    type="password"
-                    required
-                    className="block w-full pl-11 pr-4 py-3.5 bg-accent-50/50 dark:bg-accent-900/10 border border-accent-200 dark:border-accent-800/50 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition-all font-medium"
-                    placeholder="Secure Admin Code"
-                    value={formData.adminKey}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
+                  <p className="text-[10px] text-amber-600 mt-1.5 font-medium italic">* Roll number must match the one provided by admin.</p>
+                </motion.div>
+              )}
+
+              {(formData.role === 'admin' || formData.role === 'teacher') && (
+                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Registration Key <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <Key className="h-5 w-5 text-accent-500" />
+                    </div>
+                    <input
+                      name="adminKey" type="password" required
+                      className="block w-full pl-11 pr-4 py-3 bg-accent-50/50 dark:bg-accent-900/10 border border-accent-200 dark:border-accent-800/50 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition-all font-medium"
+                      placeholder="Secure Admin Code"
+                      value={formData.adminKey} onChange={handleChange}
+                    />
+                  </div>
+                </motion.div>
+              )}
             </div>
 
             <button

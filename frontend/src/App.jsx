@@ -15,6 +15,7 @@ import Register from './pages/Register';
 import Profile from './pages/Profile';
 import LeaveManagement from './pages/LeaveManagement';
 import Fees from './pages/Fees';
+import StudentFees from './pages/StudentFees';
 
 function App() {
   return (
@@ -52,12 +53,25 @@ function App() {
             {/* Admin-only routes */}
             <Route path="reports"  element={<RoleRoute role="admin"><Reports /></RoleRoute>} />
             <Route path="teachers" element={<RoleRoute role="admin"><Teachers /></RoleRoute>} />
-            <Route path="fees"     element={<RoleRoute role="admin"><Fees /></RoleRoute>} />
+            
+            {/* Fees: Admin view or Student/Parent view */}
+            <Route path="fees" element={
+              <RoleRoute role={['admin', 'student', 'parent']}>
+                <FeesSwitcher />
+              </RoleRoute>
+            } />
           </Route>
         </Routes>
       </AuthProvider>
     </BrowserRouter>
   );
 }
+
+// Simple switcher for Fees page
+const FeesSwitcher = () => {
+  const { user } = useAuth();
+  if (user?.role === 'admin') return <Fees />;
+  return <StudentFees />;
+};
 
 export default App;

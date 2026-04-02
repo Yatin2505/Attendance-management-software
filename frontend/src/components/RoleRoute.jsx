@@ -11,7 +11,10 @@ const RoleRoute = ({ children, role }) => {
   const location = useLocation();
 
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
-  if (role && user.role !== role) return <Navigate to="/" replace />;
+  if (role) {
+    const roles = Array.isArray(role) ? role : [role];
+    if (!roles.includes(user.role)) return <Navigate to="/" replace />;
+  }
 
   return children;
 };
