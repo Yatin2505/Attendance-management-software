@@ -31,18 +31,9 @@ const clearDatabase = async () => {
     console.log('Clearing Leave Requests...');
     await LeaveRequest.deleteMany({});
 
-    console.log('Clearing Users (except admins)...');
-    // Keep admins, or at least yatin@test.com
-    await User.deleteMany({ role: { $ne: 'admin' } });
+    console.log('Clearing Users (TOTAL WIPE)...');
+    await User.deleteMany({});
     
-    // Specifically ensure yatin@test.com is kept if he is an admin
-    const adminExists = await User.findOne({ email: 'yatin@test.com' });
-    if (adminExists) {
-      console.log('Preserved admin user: yatin@test.com');
-    } else {
-      console.warn('Warning: yatin@test.com not found among admins. Please ensure you have an admin account.');
-    }
-
     console.log('Database cleared successfully!');
     process.exit(0);
   } catch (err) {
