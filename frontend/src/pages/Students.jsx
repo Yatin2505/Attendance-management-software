@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, Edit2, Trash2, Filter, Users, X,
   GraduationCap, CheckSquare, Square, Inbox, UploadCloud,
-  Eye, ChevronDown, AlertTriangle, Download
+  Eye, ChevronDown, AlertTriangle, Download, CheckCircle
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getCurrentUser } from '../services/authService';
