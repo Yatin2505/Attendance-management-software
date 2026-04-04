@@ -90,7 +90,10 @@ const recordPayment = async (req, res) => {
     
     fee.paidAmount += Number(amount);
     fee.paymentHistory.push({
-      amount, paymentMethod, remarks, paymentDate: new Date()
+      amount: Number(amount), 
+      paymentMethod, 
+      remarks, 
+      paymentDate: new Date()
     });
     
     await fee.save();
@@ -116,6 +119,7 @@ const recordPayment = async (req, res) => {
 
     res.status(200).json(fee);
   } catch (error) {
+    console.error('Payment recording error:', error);
     res.status(400).json({ message: error.message });
   }
 };

@@ -111,10 +111,10 @@ const Fees = () => {
     setProcessing(true);
     try {
       if (assignType === 'individual') {
-        await createFee(newFee);
+        await createFee({ ...newFee, amount: Number(newFee.amount) });
         toast.success('Fee assigned to student');
       } else {
-        await assignBatchFees(newFee);
+        await assignBatchFees({ ...newFee, amount: Number(newFee.amount) });
         toast.success(`Fees assigned to batch students`);
       }
       setIsAssignModalOpen(false);
@@ -131,7 +131,7 @@ const Fees = () => {
     setProcessing(true);
     try {
       await recordPayment(paymentData.feeId, {
-        amount: paymentData.amount,
+        amount: Number(paymentData.amount),
         paymentMethod: paymentData.method,
         remarks: paymentData.remarks
       });

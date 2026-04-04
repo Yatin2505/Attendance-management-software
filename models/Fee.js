@@ -11,7 +11,7 @@ const paymentHistorySchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'Other'],
+    enum: ['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'Bank', 'Other'],
     default: 'Cash'
   },
   remarks: String
