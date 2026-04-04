@@ -37,3 +37,15 @@ export const getMyFees = async () => {
   const response = await api.get(`${API_URL}/me`);
   return response.data;
 };
+
+// Admin: Update a fee record
+export const updateFee = async (id, feeData) => {
+  const response = await api.put(`${API_URL}/${id}`, feeData);
+  return response.data;
+};
+
+// Admin: Delete a fee record
+export const deleteFee = async (id) => {
+  const response = await api.delete(`${API_URL}/${id}`);
+  return response.data;
+};

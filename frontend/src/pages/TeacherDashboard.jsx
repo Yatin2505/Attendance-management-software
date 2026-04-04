@@ -53,7 +53,10 @@ const TeacherDashboard = () => {
       
       setNotifications(notificationsData.notifications.slice(0, 4));
 
-      const myBatchesData = batchesData.filter(b => b.teacherId === user._id || b.teacher === user._id);
+      // Fix: b.teacherId is populated, so it's an object. Comparison with user._id (string) was failing.
+      const myBatchesData = batchesData.filter(b => 
+        (b.teacherId?._id || b.teacherId) === user._id
+      );
       setRecentBatches(myBatchesData.slice(0, 3));
 
       setStats({

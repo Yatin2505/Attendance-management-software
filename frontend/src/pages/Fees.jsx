@@ -9,9 +9,14 @@ import {
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
-import { getFees, createFee, assignBatchFees, recordPayment, getFeeStats } from '../services/feeService';
+import { 
+  getFees, createFee, assignBatchFees, 
+  recordPayment, getFeeStats, updateFee, deleteFee 
+} from '../services/feeService';
 import { getStudents } from '../services/studentService';
 import { getBatches } from '../services/batchService';
+import ConfirmModal from '../components/ConfirmModal';
+import { Edit2, Trash2 } from 'lucide-react';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', {
@@ -59,6 +64,14 @@ const Fees = () => {
   });
 
   const [paymentData, setPaymentData] = useState({ feeId: '', studentName: '', amount: '', method: 'Cash', remarks: '' });
+  
+  // Edit Modal
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editFee, setEditFee] = useState(null);
+  
+  // Delete Confirmation
+  const [deleteId, setDeleteId] = useState(null);
+  
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
@@ -129,6 +142,32 @@ const Fees = () => {
       toast.error(err.response?.data?.message || 'Failed to record payment');
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const handleEditFee = async (e) => {
+    e.preventDefault();
+    setProcessing(true);
+    try {
+      await updateFee(editFee._id, editFee);
+      toast.success('Fee record updated');
+      setIsEditModalOpen(false);
+      fetchInitialData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update fee');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleDeleteFee = async () => {
+    try {
+      await deleteFee(deleteId);
+      toast.success('Fee record deleted');
+      setDeleteId(null);
+      fetchInitialData();
+    } catch (err) {
+      toast.error('Failed to delete fee record');
     }
   };
 
@@ -270,18 +309,37 @@ const Fees = () => {
                     <StatusBadge status={fee.status} />
                   </td>
                   <td className="py-4 px-6 text-right">
-                    {fee.status !== 'Paid' && (
+                    <div className="flex items-center justify-end gap-2">
+                      {fee.status !== 'Paid' && (
+                        <button 
+                          onClick={() => {
+                            setPaymentData({ feeId: fee._id, studentName: fee.studentId?.name, amount: fee.amount - fee.paidAmount, method: 'Cash', remarks: '' });
+                            setIsPaymentModalOpen(true);
+                          }}
+                          className="p-2 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white rounded-lg transition-all"
+                          title="Record Payment"
+                        >
+                          <Wallet className="w-4 h-4" />
+                        </button>
+                      )}
                       <button 
                         onClick={() => {
-                          setPaymentData({ feeId: fee._id, studentName: fee.studentId?.name, amount: fee.amount - fee.paidAmount, method: 'Cash', remarks: '' });
-                          setIsPaymentModalOpen(true);
+                          setEditFee({ ...fee });
+                          setIsEditModalOpen(true);
                         }}
-                        className="p-2 bg-primary-500/10 text-primary-600 hover:bg-primary-500 hover:text-white rounded-lg transition-all"
-                        title="Record Payment"
+                        className="p-2 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg transition-all"
+                        title="Edit Record"
                       >
-                        <Wallet className="w-4 h-4" />
+                        <Edit2 className="w-4 h-4" />
                       </button>
-                    )}
+                      <button 
+                        onClick={() => setDeleteId(fee._id)}
+                        className="p-2 bg-rose-500/10 text-rose-600 hover:bg-rose-500 hover:text-white rounded-lg transition-all"
+                        title="Delete Record"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -445,6 +503,77 @@ const Fees = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Edit Fee Modal */}
+      <AnimatePresence>
+        {isEditModalOpen && editFee && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10"
+            >
+              <div className="px-6 py-4 bg-slate-50 dark:bg-white/5 border-b border-slate-100 dark:border-white/10 flex justify-between items-center">
+                <h3 className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                  <Edit2 className="w-4 h-4 text-amber-500" /> Edit Fee Record 
+                </h3>
+                <button onClick={() => setIsEditModalOpen(false)} className="text-slate-400 hover:text-rose-500 transition-colors"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="px-6 pt-4 text-center">
+                 <p className="text-xs text-slate-400 font-medium italic">Modifying record for</p>
+                 <p className="text-lg font-bold text-slate-800 dark:text-white leading-tight">{editFee.studentId?.name}</p>
+              </div>
+              <form onSubmit={handleEditFee} className="p-6 space-y-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Fee Amount (₹)</label>
+                     <input type="number" required value={editFee.amount} onChange={e => setEditFee({...editFee, amount: Number(e.target.value)})} className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm" />
+                  </div>
+                  <div>
+                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Month</label>
+                     <select value={editFee.month} onChange={e => setEditFee({...editFee, month: e.target.value})} className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm">
+                       {['January','February','March','April','May','June','July','August','September','October','November','December'].map(m => <option key={m}>{m}</option>)}
+                     </select>
+                  </div>
+                  <div>
+                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Year</label>
+                     <input type="number" value={editFee.year} onChange={e => setEditFee({...editFee, year: Number(e.target.value)})} className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm" />
+                  </div>
+                  <div className="col-span-2">
+                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Due Date</label>
+                     <input type="date" required value={editFee.dueDate?.split('T')[0]} onChange={e => setEditFee({...editFee, dueDate: e.target.value})} className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm" />
+                  </div>
+                  <div className="col-span-2">
+                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Description</label>
+                     <input type="text" value={editFee.description} onChange={e => setEditFee({...editFee, description: e.target.value})} className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm" />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex gap-3">
+                  <button type="button" onClick={() => setIsEditModalOpen(false)} className="flex-1 py-3 text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors">Cancel</button>
+                  <button 
+                    disabled={processing}
+                    className="flex-[2] py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold shadow-lg shadow-primary-500/25 transition-all disabled:opacity-50"
+                  >
+                    {processing ? 'Saving...' : 'Update Record'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <ConfirmModal 
+        isOpen={!!deleteId}
+        title="Delete Fee Record"
+        message="Are you sure you want to delete this fee record? This will also remove the payment history. This action cannot be undone."
+        onConfirm={handleDeleteFee}
+        onCancel={() => setDeleteId(null)}
+        confirmVariant="danger"
+      />
     </div>
   );
 };

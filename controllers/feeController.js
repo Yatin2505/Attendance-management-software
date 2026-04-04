@@ -191,11 +191,56 @@ const getFeeStats = async (req, res) => {
   }
 };
 
+// @desc    Update a fee record
+// @route   PUT /api/fees/:id
+// @access  Admin
+const updateFee = async (req, res) => {
+  try {
+    const { amount, month, year, dueDate, description } = req.body;
+    const fee = await Fee.findById(req.params.id);
+
+    if (!fee) {
+      return res.status(404).json({ message: 'Fee record not found' });
+    }
+
+    if (amount !== undefined)      fee.amount = amount;
+    if (month !== undefined)       fee.month = month;
+    if (year !== undefined)        fee.year = year;
+    if (dueDate !== undefined)     fee.dueDate = dueDate;
+    if (description !== undefined) fee.description = description;
+
+    const updatedFee = await fee.save();
+    res.status(200).json(updatedFee);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// @desc    Delete a fee record
+// @route   DELETE /api/fees/:id
+// @access  Admin
+const deleteFee = async (req, res) => {
+  try {
+    const fee = await Fee.findById(req.params.id);
+
+    if (!fee) {
+      return res.status(404).json({ message: 'Fee record not found' });
+    }
+
+    await Fee.findByIdAndDelete(req.params.id);
+    res.status(200).json({ message: 'Fee record deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createFee,
   assignBatchFees,
   recordPayment,
   getFees,
   getMyFees,
-  getFeeStats
+  getFeeStats,
+  updateFee,
+  deleteFee
 };
