@@ -92,8 +92,9 @@ const Fees = () => {
       ]);
       setFees(feeList);
       setStats(feeStats);
-      setStudents(studentList.students || []);
-      setBatches(batchList);
+      // Backend getStudents might return directly as array in some cases
+      setStudents(Array.isArray(studentList.students) ? studentList.students : (Array.isArray(studentList) ? studentList : []));
+      setBatches(Array.isArray(batchList) ? batchList : (Array.isArray(batchList.batches) ? batchList.batches : []));
     } catch (err) {
       toast.error('Failed to load financial data');
     } finally {

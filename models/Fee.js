@@ -58,7 +58,7 @@ const feeSchema = new mongoose.Schema({
 });
 
 // Pre-save hook to update status based on paidAmount
-feeSchema.pre('save', function(next) {
+feeSchema.pre('save', async function() {
   if (this.paidAmount >= this.amount) {
     this.status = 'Paid';
   } else if (this.paidAmount > 0) {
@@ -66,7 +66,6 @@ feeSchema.pre('save', function(next) {
   } else {
     this.status = 'Pending';
   }
-  next();
 });
 
 module.exports = mongoose.model('Fee', feeSchema);
