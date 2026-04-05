@@ -13,7 +13,7 @@ const toUTCMidnight = (dateInput) => {
 const canAccessBatch = (user, batch) => {
   if (user.role === 'admin') return true;
   if (!batch.teacherId) return false;
-  return batch.teacherId.toString() === user.id;
+  return batch.teacherId.toString() === user._id.toString();
 };
 
 // @desc    Mark attendance for a student (upsert — creates or updates)

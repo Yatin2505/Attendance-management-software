@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getStudents } from '../services/studentService';
 import { getBatches } from '../services/batchService';
 import { getAttendance } from '../services/attendanceService';
+import { getDashboardStats } from '../services/dashboardService';
 import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { motion } from 'framer-motion';
@@ -9,6 +10,7 @@ import { Users, Layers, CheckCircle, CalendarDays, ArrowRight } from 'lucide-rea
 import { useAuth } from '../context/AuthContext';
 import SkeletonLoader from '../components/SkeletonLoader';
 import notificationService from '../services/notificationService';
+import toast from 'react-hot-toast';
 import { Bell, Info, CheckCircle as CheckCircleIcon, AlertTriangle, XCircle, ChevronRight } from 'lucide-react';
 
 const containerVariants = {
