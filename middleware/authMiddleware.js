@@ -21,15 +21,16 @@ const protect = async (req, res, next) => {
         return res.status(401).json({ message: 'Not authorized, user not found' });
       }
 
-      // Check if user is active
-      if (!req.user.isActive) {
+      // Check if user is active (default to true for existing records)
+      if (req.user.isActive === false) {
         return res.status(403).json({ message: 'Account suspended. Please contact support.' });
       }
 
       // If user is not SuperAdmin, check if their institute is active
       if (req.user.role !== 'superadmin' && req.user.instituteId) {
         const institute = await User.findById(req.user.instituteId).lean();
-        if (institute && !institute.isActive) {
+        // If institute is explicitly marked as inactive, block access
+        if (institute && institute.isActive === false) {
            return res.status(403).json({ message: 'Institute account suspended. Please contact support.' });
         }
       }
