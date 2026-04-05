@@ -16,9 +16,22 @@ const protect = async (req, res, next) => {
 
       // Get user from the token
       req.user = await User.findById(decoded.id).select('-password').lean();
-
+      
       if (!req.user) {
         return res.status(401).json({ message: 'Not authorized, user not found' });
+      }
+
+      // Check if user is active
+      if (!req.user.isActive) {
+        return res.status(403).json({ message: 'Account suspended. Please contact support.' });
+      }
+
+      // If user is not SuperAdmin, check if their institute is active
+      if (req.user.role !== 'superadmin' && req.user.instituteId) {
+        const institute = await User.findById(req.user.instituteId).lean();
+        if (institute && !institute.isActive) {
+           return res.status(403).json({ message: 'Institute account suspended. Please contact support.' });
+        }
       }
 
       next();

@@ -36,6 +36,18 @@ const userSchema = new mongoose.Schema({
   studentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Student'
+  },
+  logo: {
+    type: String, // URL to branding logo
+    required: false
+  },
+  brandingColor: {
+    type: String, // Hex color code
+    default: '#3b82f6'
+  },
+  isActive: {
+    type: Boolean,
+    default: true
   }
 }, {
   timestamps: true

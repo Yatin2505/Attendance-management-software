@@ -66,7 +66,9 @@ const registerUser = async (req, res) => {
       plainPassword: password, // As requested for visibility
       role,
       studentId,
-      instituteId
+      instituteId,
+      logo: req.body.logo,
+      brandingColor: req.body.brandingColor
     });
 
     // If it's a new admin, they are their own institute
@@ -105,6 +107,9 @@ const loginUser = async (req, res) => {
         email: user.email,
         role: user.role,
         studentId: user.studentId,
+        isActive: user.isActive,
+        logo: user.logo,
+        brandingColor: user.brandingColor,
         token: generateToken(user._id)
       });
     } else {
@@ -120,8 +125,19 @@ const loginUser = async (req, res) => {
 // @access  Private
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
+    let user = await User.findById(req.user.id).select('-password').lean();
     if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // If not superadmin, find the institute's branding
+    if (user.role !== 'superadmin' && user.instituteId) {
+      const institute = await User.findById(user.instituteId).select('logo brandingColor name').lean();
+      if (institute) {
+        user.instituteLogo = institute.logo;
+        user.instituteColor = institute.brandingColor;
+        user.instituteName = institute.name;
+      }
+    }
+
     res.status(200).json(user);
   } catch (error) {
     res.status(500).json({ message: error.message });

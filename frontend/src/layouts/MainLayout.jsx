@@ -78,8 +78,18 @@ const MainLayout = () => {
 
   const closeMobile = () => setIsMobileMenuOpen(false);
 
+  // Dynamic Branding
+  const isSuperAdmin = user?.role === 'superadmin';
+  const displayLogo = isSuperAdmin ? null : (user?.instituteLogo || user?.logo);
+  const displayName = isSuperAdmin ? 'Tecno Skill' : (user?.instituteName || user?.name);
+  const displaySub = isSuperAdmin ? 'Attendance Pro' : 'Coaching Portal';
+  const brandColor = user?.instituteColor || user?.brandingColor || '#3b82f6';
+
   return (
-    <div className="flex h-screen bg-mesh-light dark:bg-mesh-dark font-sans overflow-hidden transition-colors duration-500">
+    <div 
+      className="flex h-screen bg-mesh-light dark:bg-mesh-dark font-sans overflow-hidden transition-colors duration-500"
+      style={{ '--primary-500': brandColor }}
+    >
 
       {/* ── Mobile overlay ──────────────────────────────────────────────────── */}
       <AnimatePresence>
@@ -101,14 +111,18 @@ const MainLayout = () => {
       `}>
         {/* Logo */}
         <div className="p-6 flex items-center gap-3 flex-shrink-0">
-          <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/30 neon-glow flex-shrink-0">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-lg font-extrabold tracking-tight bg-gradient-to-br from-slate-900 to-slate-600 dark:from-white dark:to-slate-400 bg-clip-text text-transparent">Tecno Skill</h1>
-            <p className="text-primary-600 dark:text-primary-400 text-[0.6rem] font-bold uppercase tracking-widest">Attendance Pro</p>
+          {displayLogo ? (
+            <img src={displayLogo} alt="Logo" className="w-10 h-10 rounded-xl object-cover shadow-lg neon-glow flex-shrink-0" />
+          ) : (
+            <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/30 neon-glow flex-shrink-0">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+              </svg>
+            </div>
+          )}
+          <div className="min-w-0">
+            <h1 className="text-lg font-extrabold tracking-tight bg-gradient-to-br from-slate-900 to-slate-600 dark:from-white dark:to-slate-400 bg-clip-text text-transparent truncate">{displayName}</h1>
+            <p className="text-primary-600 dark:text-primary-400 text-[0.6rem] font-bold uppercase tracking-widest truncate">{displaySub}</p>
           </div>
         </div>
 

@@ -1,7 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { getTeachers, createTeacher, deleteTeacher, getAdmins } = require('../controllers/userController');
-const { protect } = require('../middleware/authMiddleware');
+const { 
+  getTeachers, 
+  createTeacher, 
+  deleteTeacher, 
+  getAdmins,
+  toggleInstituteStatus,
+  deleteInstitute
+} = require('../controllers/userController');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.route('/teachers')
   .get(protect, getTeachers)
@@ -11,6 +18,12 @@ router.route('/teachers/:id')
   .delete(protect, deleteTeacher);
 
 router.route('/admins')
-  .get(protect, getAdmins);
+  .get(protect, authorize('superadmin'), getAdmins);
+
+router.route('/admins/:id')
+  .delete(protect, authorize('superadmin'), deleteInstitute);
+
+router.route('/admins/:id/status')
+  .patch(protect, authorize('superadmin'), toggleInstituteStatus);
 
 module.exports = router;
