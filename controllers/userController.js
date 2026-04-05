@@ -183,11 +183,46 @@ const deleteInstitute = async (req, res) => {
   }
 };
 
+// @desc    Update Institute Branding (Name, Logo, Color)
+// @route   PATCH /api/users/institute/branding
+// @access  Private/Admin
+const updateInstituteBranding = async (req, res) => {
+  try {
+    const { user } = req;
+    if (user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only Institute Admin can update branding' });
+    }
+
+    const { name, logo, brandingColor } = req.body;
+    const institute = await User.findById(user._id);
+
+    if (!institute) {
+      return res.status(404).json({ message: 'Institute not found' });
+    }
+
+    institute.name = name || institute.name;
+    institute.logo = logo !== undefined ? logo : institute.logo;
+    institute.brandingColor = brandingColor || institute.brandingColor;
+
+    await institute.save();
+
+    res.status(200).json({
+      message: 'Institute branding updated successfully',
+      name: institute.name,
+      logo: institute.logo,
+      brandingColor: institute.brandingColor
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   getTeachers,
   createTeacher,
   deleteTeacher,
   getAdmins,
   toggleInstituteStatus,
-  deleteInstitute
+  deleteInstitute,
+  updateInstituteBranding
 };

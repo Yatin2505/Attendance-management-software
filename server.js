@@ -44,7 +44,7 @@ app.use(express.json());
 // Health & root info endpoints
 app.get('/', (req, res) => {
   res.json({
-    name: 'Tecno Skill Attendance Management API',
+    name: 'Mantech Attendance Management API',
     version: '1.0.0',
     status: 'running',
     timestamp: new Date().toISOString(),

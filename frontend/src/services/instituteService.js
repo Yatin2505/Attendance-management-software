@@ -23,3 +23,8 @@ export const toggleInstituteStatus = async (id) => {
   const { data } = await api.patch(`/users/admins/${id}/status`);
   return data;
 };
+
+export const updateInstituteBranding = async (brandingData) => {
+  const { data } = await api.patch('/users/institute/branding', brandingData);
+  return data;
+};

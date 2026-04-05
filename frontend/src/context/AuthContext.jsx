@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { getCurrentUser, loginUser, logoutUser as logoutService } from '../services/authService';
+import { getCurrentUser, loginUser, logoutUser as logoutService, getMe } from '../services/authService';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext();
@@ -56,7 +56,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, setUser, loading, login, logout, updateUser }}>
       {!loading && children}
     </AuthContext.Provider>
   );

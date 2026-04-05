@@ -1,6 +1,6 @@
 # Attendance Management System
 
-A full-stack attendance management web application built for **Tecno Skill** coding coaching institute.
+A full-stack attendance management web application built for **Mantech Attendance Pro** coding coaching institute.
 
 ## 🌐 Live Deployment
 - **Frontend (Vercel):** [attendance-management-software-nine.vercel.app](https://attendance-management-software-nine.vercel.app)
@@ -108,4 +108,4 @@ All data endpoints require `Authorization: Bearer <token>` header.
 
 ---
 
-*Built with ❤️ by Yatin for Tecno Skill Coaching Institute*
+*Built with ❤️ by Yatin for Mantech Attendance Pro Coaching Institute*

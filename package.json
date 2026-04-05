@@ -1,7 +1,7 @@
 {
   "name": "attendance-software",
   "version": "1.0.0",
-  "description": "Tecno Skill Attendance Management System",
+  "description": "Mantech Attendance Management System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -9,7 +9,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": ["attendance", "coaching", "management"],
-  "author": "Tecno Skill",
+  "author": "Mantech",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {

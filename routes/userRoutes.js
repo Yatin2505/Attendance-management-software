@@ -6,7 +6,8 @@ const {
   deleteTeacher, 
   getAdmins,
   toggleInstituteStatus,
-  deleteInstitute
+  deleteInstitute,
+  updateInstituteBranding
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -25,5 +26,8 @@ router.route('/admins/:id')
 
 router.route('/admins/:id/status')
   .patch(protect, authorize('superadmin'), toggleInstituteStatus);
+
+router.route('/institute/branding')
+  .patch(protect, updateInstituteBranding);
 
 module.exports = router;

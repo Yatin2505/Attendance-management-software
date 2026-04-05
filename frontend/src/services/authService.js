@@ -38,3 +38,11 @@ export const changePassword = async (currentPassword, newPassword) => {
   return response.data;
 };
 
+export const updateProfile = async (profileData) => {
+  const response = await api.put('/auth/profile', profileData);
+  if (response.data) {
+    localStorage.setItem('user', JSON.stringify({ ...getCurrentUser(), ...response.data }));
+  }
+  return response.data;
+};
+

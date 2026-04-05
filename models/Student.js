@@ -20,6 +20,14 @@ const studentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
+  },
+  profilePhoto: {
+    type: String, // URL to student profile photo
+    required: false
+  },
+  contactNumber: {
+    type: String,
+    required: false
   }
 }, {
   timestamps: true

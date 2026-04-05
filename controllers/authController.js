@@ -138,6 +138,15 @@ const getMe = async (req, res) => {
       }
     }
 
+    // If student, get student profile fields
+    if (user.role === 'student' && user.studentId) {
+      const student = await Student.findById(user.studentId).lean();
+      if (student) {
+        user.profilePhoto = student.profilePhoto || user.profilePhoto;
+        user.contactNumber = student.contactNumber || user.contactNumber;
+      }
+    }
+
     res.status(200).json(user);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -172,9 +181,51 @@ const changePassword = async (req, res) => {
   }
 };
 
+// @desc    Update current user's profile
+// @route   PUT /api/auth/profile
+// @access  Private
+const updateProfile = async (req, res) => {
+  try {
+    const { name, profilePhoto, contactNumber } = req.body;
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.name = name || user.name;
+    user.profilePhoto = profilePhoto || user.profilePhoto;
+    user.contactNumber = contactNumber || user.contactNumber;
+
+    await user.save();
+
+    // If student, also update the Student record
+    if (user.role === 'student' && user.studentId) {
+      await Student.findByIdAndUpdate(user.studentId, {
+        name: user.name,
+        profilePhoto: user.profilePhoto,
+        contactNumber: user.contactNumber
+      });
+    }
+
+    res.status(200).json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      profilePhoto: user.profilePhoto,
+      contactNumber: user.contactNumber,
+      message: 'Profile updated successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   getMe,
-  changePassword
+  changePassword,
+  updateProfile
 };

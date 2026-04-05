@@ -48,6 +48,14 @@ const userSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  profilePhoto: {
+    type: String, // URL to user profile photo
+    required: false
+  },
+  contactNumber: {
+    type: String,
+    required: false
   }
 }, {
   timestamps: true

@@ -81,9 +81,11 @@ const MainLayout = () => {
   // Dynamic Branding
   const isSuperAdmin = user?.role === 'superadmin';
   const displayLogo = isSuperAdmin ? null : (user?.instituteLogo || user?.logo);
-  const displayName = isSuperAdmin ? 'Tecno Skill' : (user?.instituteName || user?.name);
+  const displayName = isSuperAdmin ? 'Mantech' : (user?.instituteName || user?.name);
   const displaySub = isSuperAdmin ? 'Attendance Pro' : 'Coaching Portal';
-  const brandColor = user?.instituteColor || user?.brandingColor || '#3b82f6';
+  
+  // Only apply custom color if user belongs to an institute and is not SuperAdmin
+  const brandColor = (!isSuperAdmin && (user?.instituteColor || user?.brandingColor)) ? (user?.instituteColor || user?.brandingColor) : '#3b82f6';
 
   return (
     <div 
@@ -274,7 +276,7 @@ const MainLayout = () => {
       <ConfirmModal
         isOpen={showLogoutConfirm}
         title="Sign Out"
-        message="Are you sure you want to sign out of Tecno Skill Attendance Pro?"
+        message="Are you sure you want to sign out of Mantech Attendance Pro?"
         confirmLabel="Sign Out"
         confirmVariant="primary"
         onConfirm={handleLogout}

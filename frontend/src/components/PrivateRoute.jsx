@@ -20,7 +20,7 @@ const PrivateRoute = ({ children }) => {
             <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
             <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
           </div>
-          <p className="text-sm text-slate-400 font-medium">Loading Tecno Skill…</p>
+          <p className="text-sm text-slate-400 font-medium">Loading Mantech…</p>
         </div>
       </div>
     );

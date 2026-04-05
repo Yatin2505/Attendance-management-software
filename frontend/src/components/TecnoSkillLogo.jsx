@@ -6,7 +6,7 @@ const TecnoSkillLogo = ({ className = 'w-32 h-10' }) => (
       </svg>
     </div>
     <div className="font-bold bg-gradient-to-r from-primary-500 via-primary-600 to-purple-600 bg-clip-text text-transparent text-xl tracking-tight">
-      Tecno Skill
+      Mantech
     </div>
     <div className="text-xs font-semibold uppercase tracking-wider bg-primary-500/20 text-primary-500 px-2 py-0.5 rounded-full">
       Pro

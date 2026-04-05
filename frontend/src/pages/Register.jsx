@@ -62,7 +62,7 @@ const Register = () => {
               <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /></svg>
             </div>
             <div>
-              <h1 className="text-3xl font-extrabold text-white tracking-tight">Tecno Skill</h1>
+              <h1 className="text-3xl font-extrabold text-white tracking-tight">Mantech</h1>
               <p className="text-primary-400 text-sm font-bold uppercase tracking-widest mt-1">Attendance Pro</p>
             </div>
           </motion.div>
