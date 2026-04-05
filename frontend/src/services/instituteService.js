@@ -1,15 +1,13 @@
-import axios from 'axios';
-
-const API_URL = '/api/auth'; // We'll use auth routes for admin creation
+import api from './api';
 
 export const getInstitutes = async () => {
-  const { data } = await axios.get('/api/users/admins'); // We'll add this endpoint to userController
+  const { data } = await api.get('/users/admins');
   return data;
 };
 
 export const createInstitute = async (adminData) => {
   // adminData: { name, email, password }
-  const { data } = await axios.post('/api/auth/register', { 
+  const { data } = await api.post('/auth/register', { 
     ...adminData, 
     role: 'admin' 
   });
