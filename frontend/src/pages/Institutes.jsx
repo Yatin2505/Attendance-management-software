@@ -55,19 +55,19 @@ const Institutes = () => {
   const columns = [
     { 
       header: 'Institute Name', 
-      accessor: 'name',
-      render: (val) => <span className="font-bold text-slate-800 dark:text-white">{val}</span>
+      accessorKey: 'name',
+      cell: info => <span className="font-bold text-slate-800 dark:text-white">{info.getValue()}</span>
     },
-    { header: 'Admin Email', accessor: 'email' },
+    { header: 'Admin Email', accessorKey: 'email' },
     { 
       header: 'Admin Password', 
-      accessor: 'plainPassword',
-      render: (val) => <code className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded font-mono text-xs">{val || '••••••••'}</code>
+      accessorKey: 'plainPassword',
+      cell: info => <code className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded font-mono text-xs">{info.getValue() || '••••••••'}</code>
     },
     { 
       header: 'Created At', 
-      accessor: 'createdAt',
-      render: (val) => new Date(val).toLocaleDateString()
+      accessorKey: 'createdAt',
+      cell: info => new Date(info.getValue()).toLocaleDateString()
     }
   ];
 

@@ -20,13 +20,10 @@ const initSuperAdmin = async () => {
       process.exit(0);
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
     const superAdmin = await User.create({
       name: 'Super Admin',
       email,
-      password: hashedPassword,
+      password: password, // Model's pre-save hook will hash this
       plainPassword: password, // As requested for SaaS management
       role: 'superadmin'
     });
