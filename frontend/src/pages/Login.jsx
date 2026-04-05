@@ -25,7 +25,7 @@ const Login = () => {
       if (!done) setServerStatus('waking');
     }, 1800);
 
-    fetch(`${API_URL}/api/health`)
+    fetch(`${API_URL}/health`)
       .then(() => {
         done = true;
         clearTimeout(timer);
