@@ -257,8 +257,8 @@ const updateAttendance = async (req, res) => {
   try {
     const { status } = req.body;
 
-    if (!['present', 'absent', 'late'].includes(status)) {
-      return res.status(400).json({ message: 'Status must be present, absent, or late' });
+    if (!['present', 'absent', 'late', 'leave'].includes(status)) {
+      return res.status(400).json({ message: 'Status must be present, absent, late, or leave' });
     }
 
     const attendance = await Attendance.findById(req.params.id).populate('batchId');

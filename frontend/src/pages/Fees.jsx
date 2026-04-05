@@ -4,7 +4,7 @@ import {
   Wallet, Plus, Users, Search, Filter,
   CheckCircle, Clock, AlertCircle, X,
   TrendingUp, ArrowRight, Download, CreditCard,
-  Calendar, Layers, RefreshCw, MoreVertical, DollarSign
+  Calendar, Layers, RefreshCw, MoreVertical, DollarSign, Edit2, Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -16,7 +16,6 @@ import {
 import { getStudents } from '../services/studentService';
 import { getBatches } from '../services/batchService';
 import ConfirmModal from '../components/ConfirmModal';
-import { Edit2, Trash2 } from 'lucide-react';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', {

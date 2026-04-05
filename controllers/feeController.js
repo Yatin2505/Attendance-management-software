@@ -111,9 +111,10 @@ const recordPayment = async (req, res) => {
     }
 
     // Notify Admins
+    const populatedFee = await Fee.findById(fee._id).populate('studentId');
     await notifyAdmins(
       'Payment Confirmed',
-      `Payment of ₹${amount} recorded for student ${feeUser?.name || 'Unknown'}. Status: ${fee.status}`,
+      `Payment of ₹${amount} recorded for student ${populatedFee.studentId?.name || 'Unknown'}. Status: ${populatedFee.status}`,
       'success'
     );
 
