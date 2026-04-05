@@ -52,7 +52,12 @@ const feeSchema = new mongoose.Schema({
     type: String,
     default: 'Monthly Tuition Fee'
   },
-  paymentHistory: [paymentHistorySchema]
+  paymentHistory: [paymentHistorySchema],
+  instituteId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  }
 }, {
   timestamps: true
 });

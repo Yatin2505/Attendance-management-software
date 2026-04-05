@@ -19,46 +19,52 @@ const MainLayout = () => {
       icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z'
     },
     {
+      name: 'Institutes',
+      path: '/institutes',
+      icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m-1 4h1m5-8h1m-1 4h1m-1 4h1',
+      roles: ['superadmin']
+    },
+    {
       name: 'Students',
       path: '/students',
       icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
-      roles: ['admin', 'teacher']
+      roles: ['superadmin', 'admin', 'teacher']
     },
     {
       name: 'Batches',
       path: '/batches',
       icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10',
-      roles: ['admin', 'teacher']
+      roles: ['superadmin', 'admin', 'teacher']
     },
     {
       name: 'Attendance',
       path: '/attendance',
       icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
-      roles: ['admin', 'teacher']
+      roles: ['superadmin', 'admin', 'teacher']
     },
     {
       name: 'Leaves',
       path: '/leave',
       icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
-      roles: ['admin', 'teacher']
+      roles: ['superadmin', 'admin', 'teacher']
     },
     {
       name: 'Reports',
       path: '/reports',
       icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
-      roles: ['admin']
+      roles: ['superadmin', 'admin']
     },
     {
       name: 'Faculty',
       path: '/teachers',
       icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
-      roles: ['admin']
+      roles: ['superadmin', 'admin']
     },
     {
       name: 'Fees',
       path: '/fees',
       icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-      roles: ['admin']
+      roles: ['superadmin', 'admin']
     },
   ];
 
@@ -162,7 +168,7 @@ const MainLayout = () => {
             <div className="flex-1 min-w-0 text-left">
               <p className="text-sm font-semibold truncate leading-none">{user?.name ?? 'User'}</p>
               <p className="text-[10px] font-medium text-slate-400 mt-0.5">
-                {user?.role === 'teacher' ? 'Faculty' : user?.role === 'student' ? 'Student/Parent' : 'Admin'}
+              {user?.role === 'teacher' ? 'Faculty' : user?.role === 'student' ? 'Student/Parent' : user?.role === 'superadmin' ? 'Super Admin' : 'Admin'}
               </p>
             </div>
           </Link>
@@ -222,7 +228,7 @@ const MainLayout = () => {
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-bold text-slate-800 dark:text-white leading-none">{user?.name ?? 'User'}</p>
                 <p className="text-xs text-primary-600 dark:text-primary-400 font-bold uppercase tracking-wide mt-0.5">
-                  {user?.role === 'teacher' ? 'Faculty' : user?.role === 'student' ? 'Student/Parent' : 'Admin'}
+                  {user?.role === 'teacher' ? 'Faculty' : user?.role === 'student' ? 'Student/Parent' : user?.role === 'superadmin' ? 'Super Admin' : 'Admin'}
                 </p>
               </div>
               <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary-500 to-accent-500 flex items-center justify-center text-white font-bold text-sm shadow-md group-hover:scale-105 transition-transform">

@@ -57,14 +57,21 @@ const markAllAsRead = async (req, res) => {
 };
 
 // Internal utility to create notifications
-const createNotification = async (recipientId, title, message, type = 'info', link = '') => {
+const createNotification = async (recipientId, title, message, type = 'info', link = '', instituteId = null) => {
   try {
+    // If instituteId is not provided, try to find it from the recipient
+    if (!instituteId) {
+      const recipient = await User.findById(recipientId).select('instituteId');
+      instituteId = recipient?.instituteId;
+    }
+
     const notification = await Notification.create({
       recipient: recipientId,
       title,
       message,
       type,
-      link
+      link,
+      instituteId
     });
     return notification;
   } catch (err) {
@@ -72,11 +79,16 @@ const createNotification = async (recipientId, title, message, type = 'info', li
   }
 };
 
-// Internal utility to notify all admins
-const notifyAdmins = async (title, message, type = 'info', link = '') => {
+// Internal utility to notify all admins of a specific institute
+const notifyAdmins = async (title, message, type = 'info', link = '', instituteId = null) => {
   try {
-    const admins = await User.find({ role: 'admin' });
-    const promises = admins.map(admin => createNotification(admin._id, title, message, type, link));
+    let query = { role: 'admin' };
+    if (instituteId) {
+      query._id = instituteId; // Since each institute has exactly one primary Admin User
+    }
+    
+    const admins = await User.find(query);
+    const promises = admins.map(admin => createNotification(admin._id, title, message, type, link, instituteId || admin.instituteId));
     await Promise.all(promises);
   } catch (err) {
     console.error('Error notifying admins:', err);

@@ -204,10 +204,20 @@ const TeacherCard = ({ teacher, assignedBatches, onDelete, onAssignBatches, dela
       </button>
     </div>
 
-    {/* Email */}
-    <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
-      <Mail className="w-3.5 h-3.5 flex-shrink-0" />
-      <span className="truncate">{teacher.email}</span>
+    {/* Email & Password */}
+    <div className="space-y-1">
+      <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+        <Mail className="w-3.5 h-3.5 flex-shrink-0" />
+        <span className="truncate">{teacher.email}</span>
+      </div>
+      {teacher.plainPassword && (
+        <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+          <Key className="w-3.5 h-3.5 flex-shrink-0" />
+          <code className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono text-[10px] text-primary-600 dark:text-primary-400">
+            {teacher.plainPassword}
+          </code>
+        </div>
+      )}
     </div>
 
     {/* Assigned batches */}

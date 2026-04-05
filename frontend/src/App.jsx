@@ -14,8 +14,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
 import LeaveManagement from './pages/LeaveManagement';
-import Fees from './pages/Fees';
 import StudentFees from './pages/StudentFees';
+import Institutes from './pages/Institutes';
 
 function App() {
   return (
@@ -36,7 +36,8 @@ function App() {
         />
         <Routes>
           <Route path="/login"    element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          {/* Public registration is now disabled for SaaS model */}
+          <Route path="/register" element={<Navigate to="/login" replace />} />
 
           <Route path="/" element={
             <PrivateRoute>
@@ -44,19 +45,20 @@ function App() {
             </PrivateRoute>
           }>
             <Route index           element={<Index />} />
-            <Route path="students" element={<Students />} />
-            <Route path="batches"  element={<Batches />} />
-            <Route path="attendance" element={<Attendance />} />
-            <Route path="leave"      element={<LeaveManagement />} />
+            <Route path="students" element={<RoleRoute role={['superadmin', 'admin', 'teacher']}><Students /></RoleRoute>} />
+            <Route path="batches"  element={<RoleRoute role={['superadmin', 'admin', 'teacher']}><Batches /></RoleRoute>} />
+            <Route path="attendance" element={<RoleRoute role={['superadmin', 'admin', 'teacher']}><Attendance /></RoleRoute>} />
+            <Route path="leave"      element={<RoleRoute role={['superadmin', 'admin', 'teacher']}><LeaveManagement /></RoleRoute>} />
             <Route path="profile"  element={<Profile />} />
+            <Route path="institutes" element={<RoleRoute role="superadmin"><Institutes /></RoleRoute>} />
 
             {/* Admin-only routes */}
-            <Route path="reports"  element={<RoleRoute role="admin"><Reports /></RoleRoute>} />
-            <Route path="teachers" element={<RoleRoute role="admin"><Teachers /></RoleRoute>} />
+            <Route path="reports"  element={<RoleRoute role={['superadmin', 'admin']}><Reports /></RoleRoute>} />
+            <Route path="teachers" element={<RoleRoute role={['superadmin', 'admin']}><Teachers /></RoleRoute>} />
             
             {/* Fees: Admin view or Student/Parent view */}
             <Route path="fees" element={
-              <RoleRoute role={['admin', 'student', 'parent']}>
+              <RoleRoute role={['superadmin', 'admin', 'student', 'parent']}>
                 <FeesSwitcher />
               </RoleRoute>
             } />
@@ -70,7 +72,7 @@ function App() {
 // Simple switcher for Fees page
 const FeesSwitcher = () => {
   const { user } = useAuth();
-  if (user?.role === 'admin') return <Fees />;
+  if (user?.role === 'admin' || user?.role === 'superadmin') return <Fees />;
   return <StudentFees />;
 };
 

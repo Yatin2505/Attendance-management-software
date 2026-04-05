@@ -11,16 +11,26 @@ const { createNotification, notifyAdmins } = require('./notificationController')
 const createFee = async (req, res) => {
   try {
     const { studentId, amount, month, year, dueDate, description } = req.body;
+    const { user } = req;
     
+    // 1. Institute Isolation Check
+    const student = await Student.findById(studentId);
+    if (!student) return res.status(404).json({ message: 'Student not found' });
+
+    const instituteId = student.instituteId;
+    if (user.role !== 'superadmin' && instituteId.toString() !== (user.role === 'admin' ? user._id : user.instituteId).toString()) {
+      return res.status(403).json({ message: 'Access denied: Student belongs to another institute' });
+    }
+
     const fee = await Fee.create({
-      studentId, amount, month, year, dueDate, description
+      studentId, amount, month, year, dueDate, description, instituteId
     });
     
     // Notify student
-    const user = await User.findOne({ studentId });
-    if (user) {
+    const studentUser = await User.findOne({ studentId });
+    if (studentUser) {
       await createNotification(
-        user._id,
+        studentUser._id,
         'Fee Assigned',
         `A new fee of ₹${amount} for ${month} ${year} has been assigned to you.`,
         'info',
@@ -40,16 +50,22 @@ const createFee = async (req, res) => {
 const assignBatchFees = async (req, res) => {
   try {
     const { batchId, amount, month, year, dueDate, description } = req.body;
+    const { user } = req;
     
-    // Find students in batch
-    const students = await Student.find({ batches: batchId });
+    // Determine target institute
+    const myInst = user.role === 'admin' ? user._id : user.instituteId;
+    const instituteId = user.role === 'superadmin' ? (await Batch.findById(batchId))?.instituteId : myInst;
+
+    // Find students in batch within the same institute
+    const students = await Student.find({ batches: batchId, instituteId });
     if (!students || students.length === 0) {
-      return res.status(404).json({ message: 'No students found in this batch' });
+      return res.status(404).json({ message: 'No students found in this batch within your institute' });
     }
     
     const feeRecords = students.map(s => ({
       studentId: s._id,
-      amount, month, year, dueDate, description
+      amount, month, year, dueDate, description,
+      instituteId
     }));
     
     const result = await Fee.insertMany(feeRecords);
@@ -84,9 +100,16 @@ const assignBatchFees = async (req, res) => {
 const recordPayment = async (req, res) => {
   try {
     const { amount, paymentMethod, remarks } = req.body;
+    const { user } = req;
     const fee = await Fee.findById(req.params.id);
     
     if (!fee) return res.status(404).json({ message: 'Fee record not found' });
+    
+    // Institute Isolation
+    const myInst = user.role === 'admin' ? user._id : user.instituteId;
+    if (user.role !== 'superadmin' && fee.instituteId.toString() !== myInst.toString()) {
+      return res.status(403).json({ message: 'Access denied: Not your institute record' });
+    }
     
     fee.paidAmount += Number(amount);
     fee.paymentHistory.push({
@@ -131,8 +154,14 @@ const recordPayment = async (req, res) => {
 const getFees = async (req, res) => {
   try {
     const { studentId, batchId, status, month, year } = req.query;
+    const { user } = req;
     let query = {};
     
+    // 1. Institute Isolation
+    if (user.role !== 'superadmin') {
+      query.instituteId = user.role === 'admin' ? user._id : user.instituteId;
+    }
+
     if (studentId) query.studentId = studentId;
     if (status)    query.status = status;
     if (month)     query.month = month;
@@ -140,7 +169,7 @@ const getFees = async (req, res) => {
     
     // If batchId is provided, we filter students belonging to that batch
     if (batchId) {
-      const studentIds = await Student.find({ batches: batchId }).distinct('_id');
+      const studentIds = await Student.find({ batches: batchId, ... (query.instituteId ? { instituteId: query.instituteId } : {}) }).distinct('_id');
       query.studentId = { $in: studentIds };
     }
     
@@ -176,7 +205,16 @@ const getMyFees = async (req, res) => {
 // @access  Admin
 const getFeeStats = async (req, res) => {
   try {
+    const { user } = req;
+    let matchQuery = {};
+
+    // Institute Isolation
+    if (user.role !== 'superadmin') {
+      matchQuery.instituteId = user.role === 'admin' ? user._id : user.instituteId;
+    }
+
     const stats = await Fee.aggregate([
+      { $match: matchQuery },
       {
         $group: {
           _id: null,

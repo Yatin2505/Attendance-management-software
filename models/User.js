@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -20,8 +21,17 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'teacher', 'student', 'parent'],
+    enum: ['superadmin', 'admin', 'teacher', 'student', 'parent'],
     default: 'admin'
+  },
+  plainPassword: {
+    type: String, // As requested for visibility by superiors
+    required: false
+  },
+  instituteId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false // Null for SuperAdmins; itself for Admins; Admin ID for others
   },
   studentId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -29,6 +39,15 @@ const userSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true
+});
+
+// Pre-save hook to hash password
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) {
+    next();
+  }
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
 });
 
 module.exports = mongoose.model('User', userSchema);

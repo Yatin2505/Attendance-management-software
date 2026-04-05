@@ -38,8 +38,8 @@ const authorizeTeacherBatch = async (req, res, next) => {
 
     const { user } = req;
 
-    // Admins have full access
-    if (user.role === 'admin') return next();
+    // SuperAdmin and Admin have full access
+    if (user.role === 'superadmin' || user.role === 'admin') return next();
 
     // Teachers can only access their own batches
     if (user.role === 'teacher') {
@@ -47,6 +47,12 @@ const authorizeTeacherBatch = async (req, res, next) => {
       if (!batch || batch.teacherId.toString() !== user._id.toString()) {
         return res.status(403).json({ message: 'Access denied: Not your batch' });
       }
+
+      // Check institute isolation
+      if (batch.instituteId.toString() !== user.instituteId.toString()) {
+        return res.status(403).json({ message: 'Access denied: Batch belongs to another institute' });
+      }
+
       return next();
     }
 
@@ -60,6 +66,9 @@ const authorizeTeacherBatch = async (req, res, next) => {
 // @desc    Authorize by role
 const authorize = (...roles) => {
   return (req, res, next) => {
+    // SuperAdmin bypasses all role checks
+    if (req.user.role === 'superadmin') return next();
+
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ message: `Role ${req.user.role} is not authorized to access this route` });
     }

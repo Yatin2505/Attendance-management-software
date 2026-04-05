@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getTeachers, createTeacher, deleteTeacher } = require('../controllers/userController');
+const { getTeachers, createTeacher, deleteTeacher, getAdmins } = require('../controllers/userController');
 const { protect } = require('../middleware/authMiddleware');
 
 router.route('/teachers')
@@ -9,5 +9,8 @@ router.route('/teachers')
 
 router.route('/teachers/:id')
   .delete(protect, deleteTeacher);
+
+router.route('/admins')
+  .get(protect, getAdmins);
 
 module.exports = router;

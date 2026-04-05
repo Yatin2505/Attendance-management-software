@@ -10,63 +10,79 @@ const generateToken = (id) => {
   });
 };
 
-// @desc    Register a new user (admin/teacher)
-// @route   POST /api/auth/register
-// @access  Public
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role, adminKey, rollNumber } = req.body;
+    const { name, email, password, role, rollNumber } = req.body;
+    const creator = req.user; // Set by protect middleware
 
-    let studentId = null;
-    
-    // Role-based validation
-    if (role === 'student' || role === 'parent') {
-      if (!rollNumber) {
-        return res.status(400).json({ message: 'Roll number is required for students and parents' });
+    // 1. Role-based Authorization logic
+    if (role === 'admin') {
+      if (creator.role !== 'superadmin') {
+        return res.status(403).json({ message: 'Only SuperAdmin can create Admin accounts' });
       }
-      const student = await Student.findOne({ rollNumber });
-      if (!student) {
-        return res.status(404).json({ message: 'No student found with this roll number. Please check or contact admin.' });
+    } else if (['teacher', 'student', 'parent'].includes(role)) {
+      if (creator.role !== 'admin' && creator.role !== 'superadmin') {
+        return res.status(403).json({ message: 'Only Admin or SuperAdmin can create these accounts' });
       }
-      studentId = student._id;
-    } else {
-      // Verify Super Admin permission key for admin/teacher
-      if (adminKey !== process.env.ADMIN_REGISTRATION_KEY) {
-        return res.status(403).json({ message: 'Unauthorized: Invalid Registration Key' });
-      }
+    } else if (role === 'superadmin') {
+       return res.status(403).json({ message: 'Cannot create SuperAdmin via this route' });
     }
 
-    // Check if user exists
+    let studentId = null;
+    let instituteId = null;
+
+    // 2. Determine Institute ID
+    if (role === 'admin') {
+      // New admin is their own institute head
+      instituteId = null; // Will be set to self after creation if needed, or left null
+    } else {
+      // Subordinates inherit the Admin's instituteId
+      instituteId = creator.role === 'admin' ? creator._id : creator.instituteId;
+    }
+
+    // 3. Student Linkage
+    if (role === 'student' || role === 'parent') {
+      if (!rollNumber) {
+        return res.status(400).json({ message: 'Roll number is required' });
+      }
+      const student = await Student.findOne({ rollNumber, instituteId });
+      if (!student) {
+        return res.status(404).json({ message: 'Student not found in this institute' });
+      }
+      studentId = student._id;
+    }
+
+    // 4. Check if user exists
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create user
+    // 5. Create user
     const user = await User.create({
       name,
       email,
-      password: hashedPassword,
-      role: role || 'admin',
-      studentId
+      password,
+      plainPassword: password, // As requested for visibility
+      role,
+      studentId,
+      instituteId
     });
 
-    if (user) {
-      res.status(201).json({
-        _id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        studentId: user.studentId,
-        token: generateToken(user._id)
-      });
-    } else {
-      res.status(400).json({ message: 'Invalid user data' });
+    // If it's a new admin, they are their own institute
+    if (role === 'admin') {
+      user.instituteId = user._id;
+      await user.save();
     }
+
+    res.status(201).json({
+      _id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      plainPassword: user.plainPassword,
+      token: generateToken(user._id)
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -131,8 +147,7 @@ const changePassword = async (req, res) => {
       return res.status(400).json({ message: 'Current password is incorrect' });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(newPassword, salt);
+    user.password = newPassword;
     await user.save();
 
     res.status(200).json({ message: 'Password updated successfully' });

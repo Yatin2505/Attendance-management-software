@@ -507,6 +507,11 @@ const Students = () => {
                                 <CheckCircle className="w-2.5 h-2.5" /> Active
                               </span>
                               <span className="text-[9px] text-slate-400 truncate max-w-[100px]">{portalStatus[student._id].email}</span>
+                              {portalStatus[student._id].plainPassword && (
+                                <code className="mt-0.5 px-1 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono text-[9px] text-primary-600 dark:text-primary-400 self-start">
+                                  {portalStatus[student._id].plainPassword}
+                                </code>
+                              )}
                             </div>
                           ) : (
                             <button 

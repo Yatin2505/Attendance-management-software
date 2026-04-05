@@ -4,7 +4,7 @@ const Batch = require('../models/Batch');
 const Attendance = require('../models/Attendance');
 const User = require('../models/User');
 const { notifyAdmins } = require('./notificationController');
-const bcrypt = require('bcryptjs');
+// ... (removed redundant bcrypt import)
 
 // @desc    Create a new student
 // @route   POST /api/students
@@ -12,17 +12,22 @@ const bcrypt = require('bcryptjs');
 const createStudent = async (req, res) => {
   try {
     const { name, rollNumber, batches } = req.body;
+    const { user } = req;
 
-    // Check if student exists by roll number
-    const studentExists = await Student.findOne({ rollNumber });
+    // Determine target institute
+    const instituteId = user.role === 'admin' ? user._id : user.instituteId;
+
+    // Check if student exists by roll number within the same institute
+    const studentExists = await Student.findOne({ rollNumber, instituteId });
     if (studentExists) {
-      return res.status(400).json({ message: 'Student with this roll number already exists' });
+      return res.status(400).json({ message: 'Student with this roll number already exists in your institute' });
     }
 
     const student = await Student.create({
       name,
       rollNumber,
-      batches: Array.isArray(batches) ? batches : (batches ? [batches] : [])
+      batches: Array.isArray(batches) ? batches : (batches ? [batches] : []),
+      instituteId
     });
 
     // Add reference to batches if assigned
@@ -50,22 +55,28 @@ const createStudent = async (req, res) => {
 const getStudents = async (req, res) => {
   try {
     const { batchId, name } = req.query;
+    const { user } = req;
     
     let query = {};
-    if (req.user.role === 'teacher') {
-      const teacherBatches = await Batch.find({ teacherId: req.user.id }).select('_id');
-      const batchIds = teacherBatches.map(b => b._id);
+
+    // 1. Institute Isolation
+    if (user.role !== 'superadmin') {
+      query.instituteId = user.role === 'admin' ? user._id : user.instituteId;
+    }
+
+    // 2. Teacher Batch Isolation
+    if (user.role === 'teacher') {
+      const teacherBatches = await Batch.find({ teacherId: user._id }).select('_id');
+      const batchIds = teacherBatches.map(b => b._id.toString());
       
-      if (batchId && !batchIds.some(id => id.toString() === batchId)) {
+      if (batchId && !batchIds.includes(batchId)) {
         return res.status(403).json({ message: 'Not authorized for this batch' });
       }
       query.batches = { $in: batchId ? [batchId] : batchIds };
     } else if (batchId) {
       query.batches = { $in: [batchId] };
     }
-    if (batchId) {
-      query.batches = { $in: [batchId] };
-    }
+
     if (name) {
       query.name = { $regex: name, $options: 'i' };
     }
@@ -82,13 +93,22 @@ const getStudents = async (req, res) => {
 // @access  Private
 const getStudentById = async (req, res) => {
   try {
+    const { user } = req;
     const student = await Student.findById(req.params.id).populate('batches', 'name timing');
 
-    if (student) {
-      res.status(200).json(student);
-    } else {
-      res.status(404).json({ message: 'Student not found' });
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
     }
+
+    // Institute Isolation Check
+    if (user.role !== 'superadmin') {
+      const targetInst = user.role === 'admin' ? user._id : user.instituteId;
+      if (student.instituteId.toString() !== targetInst.toString()) {
+        return res.status(403).json({ message: 'Access denied: Not your student' });
+      }
+    }
+
+    res.status(200).json(student);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -99,16 +119,26 @@ const getStudentById = async (req, res) => {
 // @access  Private
 const updateStudent = async (req, res) => {
   try {
+    const { user } = req;
     const student = await Student.findById(req.params.id);
 
-    if (student) {
-      // Avoid rollNumber conflicts if changed
-      if (req.body.rollNumber && req.body.rollNumber !== student.rollNumber) {
-        const rollExists = await Student.findOne({ rollNumber: req.body.rollNumber });
-        if (rollExists) {
-          return res.status(400).json({ message: 'Roll number already in use' });
-        }
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    // Institute Isolation Check
+    const targetInst = user.role === 'admin' ? user._id : user.instituteId;
+    if (user.role !== 'superadmin' && student.instituteId.toString() !== targetInst.toString()) {
+      return res.status(403).json({ message: 'Access denied: Not your student' });
+    }
+
+    // Avoid rollNumber conflicts if changed
+    if (req.body.rollNumber && req.body.rollNumber !== student.rollNumber) {
+      const rollExists = await Student.findOne({ rollNumber: req.body.rollNumber, instituteId: student.instituteId });
+      if (rollExists) {
+        return res.status(400).json({ message: 'Roll number already in use' });
       }
+    }
 
       const oldBatches = student.batches ? student.batches.map(id => id.toString()) : [];
       let newBatches = req.body.batches;
@@ -144,9 +174,6 @@ const updateStudent = async (req, res) => {
       }
 
       res.status(200).json(updatedStudent);
-    } else {
-      res.status(404).json({ message: 'Student not found' });
-    }
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -157,21 +184,27 @@ const updateStudent = async (req, res) => {
 // @access  Private
 const deleteStudent = async (req, res) => {
   try {
+    const { user } = req;
     const student = await Student.findById(req.params.id);
 
-    if (student) {
-      // Remove reference from all associated batches
-      if (student.batches && student.batches.length > 0) {
-        await Promise.all(student.batches.map(bId => 
-          Batch.findByIdAndUpdate(bId, { $pull: { students: student._id } })
-        ));
-      }
-
-      await student.deleteOne();
-      res.status(200).json({ message: 'Student removed successfully' });
-    } else {
-      res.status(404).json({ message: 'Student not found' });
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
     }
+
+    // Institute Isolation Check
+    const targetInst = user.role === 'admin' ? user._id : user.instituteId;
+    if (user.role !== 'superadmin' && student.instituteId.toString() !== targetInst.toString()) {
+      return res.status(403).json({ message: 'Access denied: Not your student' });
+    }
+    // Remove reference from all associated batches
+    if (student.batches && student.batches.length > 0) {
+      await Promise.all(student.batches.map(bId => 
+        Batch.findByIdAndUpdate(bId, { $pull: { students: student._id } })
+      ));
+    }
+
+    await student.deleteOne();
+    res.status(200).json({ message: 'Student removed successfully' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -186,24 +219,29 @@ const importStudents = async (req, res) => {
       return res.status(403).json({ message: 'Only admins can mass-import students' });
     }
 
-    const studentsToImport = req.body.students; // expects array of { name, rollNumber, batchId? }
+    const studentsToImport = req.body.students; 
+    const { user } = req;
+    const instituteId = user.role === 'admin' ? user._id : user.instituteId;
+
     if (!studentsToImport || !Array.isArray(studentsToImport)) {
       return res.status(400).json({ message: 'Invalid payload, expected array of students' });
     }
 
-    // Filter duplicates against DB first
+    // Filter duplicates against DB first (within the same institute)
     const existingRollNumbers = await Student.find({
+      instituteId,
       rollNumber: { $in: studentsToImport.map(s => s.rollNumber).filter(Boolean) }
     }).select('rollNumber');
     
     const existingSet = new Set(existingRollNumbers.map(s => s.rollNumber));
     
     const validStudents = studentsToImport
-      .filter(s => s.name && s.rollNumber && !existingSet.has(s.rollNumber))
+      .filter(s => s.name && s.rollNumber && !existingSet.has(String(s.rollNumber)))
       .map(s => ({
         name: s.name.trim(),
         rollNumber: String(s.rollNumber).trim(),
-        batches: s.batchId ? [s.batchId] : []
+        batches: s.batchId ? [s.batchId] : [],
+        instituteId
       }));
 
     if (validStudents.length === 0) {
@@ -375,16 +413,14 @@ const enableStudentPortal = async (req, res) => {
     let user = await User.findOne({ email });
     if (user) return res.status(400).json({ message: 'Email already in use' });
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
     user = await User.create({
       name: student.name,
       email,
-      password: hashedPassword,
+      password,
+      plainPassword: password, // As requested
       role: 'student',
-      studentId: student._id
+      studentId: student._id,
+      instituteId: student.instituteId
     });
 
     res.status(201).json({ message: 'Portal enabled successfully', userId: user._id });
@@ -401,7 +437,8 @@ const getStudentPortalStatus = async (req, res) => {
     const user = await User.findOne({ studentId: req.params.id, role: 'student' });
     res.status(200).json({ 
       enabled: !!user,
-      email: user ? user.email : null
+      email: user ? user.email : null,
+      plainPassword: user ? user.plainPassword : null
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

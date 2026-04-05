@@ -17,6 +17,7 @@ const toUTCMidnight = (dateInput) => {
 const getDashboardStats = async (req, res) => {
   try {
     const { user } = req;
+    const isSuperAdmin = user.role === 'superadmin';
     const isAdmin = user.role === 'admin';
     const isTeacher = user.role === 'teacher';
 
@@ -27,11 +28,18 @@ const getDashboardStats = async (req, res) => {
     // -- Scope Filter --
     let scopeFilter = {};
     let teacherBatchIds = [];
+    let instituteFilter = {};
+
+    if (!isSuperAdmin) {
+      const myInst = isAdmin ? user._id : user.instituteId;
+      instituteFilter = { instituteId: myInst };
+      scopeFilter = { ...instituteFilter };
+    }
 
     if (isTeacher) {
-      const myBatches = await Batch.find({ teacherId: user._id }).select('_id');
+      const myBatches = await Batch.find({ teacherId: user._id, ...instituteFilter }).select('_id');
       teacherBatchIds = myBatches.map(b => b._id);
-      scopeFilter = { batchId: { $in: teacherBatchIds } };
+      scopeFilter.batchId = { $in: teacherBatchIds };
     }
 
     // -- Parallel queries for basic counts --
@@ -43,30 +51,27 @@ const getDashboardStats = async (req, res) => {
       recentActivity,
       feeAgg
     ] = await Promise.all([
-      isTeacher 
-        ? Student.countDocuments({ batches: { $in: teacherBatchIds } })
-        : Student.countDocuments(),
-      isTeacher
-        ? Batch.countDocuments({ teacherId: user._id })
-        : Batch.countDocuments(),
-      User.countDocuments({ role: 'teacher' }),
+      Student.countDocuments(isTeacher ? { batches: { $in: teacherBatchIds }, ...instituteFilter } : scopeFilter),
+      Batch.countDocuments(isTeacher ? { teacherId: user._id, ...instituteFilter } : scopeFilter),
+      User.countDocuments({ role: 'teacher', ...instituteFilter }),
       // Today's attendance records
       Attendance.find({ 
         date: { $gte: today, $lt: tomorrow },
-        ...(isTeacher ? scopeFilter : {})
+        ...scopeFilter
       })
         .populate('studentId', 'name rollNumber')
         .populate('batchId', 'name')
         .lean(),
       // Last 5 attendance records (any date)
-      Attendance.find(isTeacher ? scopeFilter : {})
+      Attendance.find(scopeFilter)
         .sort({ createdAt: -1 })
         .limit(5)
         .populate('studentId', 'name rollNumber')
         .populate('batchId', 'name')
         .lean(),
-      // Fee stats (Admins only)
-      isAdmin ? Fee.aggregate([
+      // Fee stats (Admins/SuperAdmins)
+      (isAdmin || isSuperAdmin) ? Fee.aggregate([
+        { $match: scopeFilter },
         {
           $group: {
             _id: null,
@@ -90,7 +95,7 @@ const getDashboardStats = async (req, res) => {
 
     // -- Overall attendance percentage --
     const overallAgg = await Attendance.aggregate([
-      { $match: isTeacher ? scopeFilter : {} },
+      { $match: scopeFilter },
       {
         $group: {
           _id: null,
@@ -115,7 +120,7 @@ const getDashboardStats = async (req, res) => {
       { 
         $match: { 
           date: { $gte: thirtyDaysAgo },
-          ...(isTeacher ? scopeFilter : {})
+          ...scopeFilter
         } 
       },
       {
@@ -147,7 +152,7 @@ const getDashboardStats = async (req, res) => {
 
     // -- Batch-wise attendance --
     const batchWise = await Attendance.aggregate([
-      { $match: isTeacher ? scopeFilter : {} },
+      { $match: scopeFilter },
       {
         $group: {
           _id: '$batchId',
@@ -215,7 +220,7 @@ const getDashboardStats = async (req, res) => {
       monthlyTrend,
       batchWise,
       recentActivity: activity,
-      fees: isAdmin ? {
+      fees: (isAdmin || isSuperAdmin) ? {
         totalCollected: feeTotals.totalPaid,
         totalPending:   feeTotals.totalAmount - feeTotals.totalPaid
       } : null

@@ -9,14 +9,15 @@ const { notifyAdmins, createNotification } = require('./notificationController')
 const createBatch = async (req, res) => {
   try {
     const { name, timing, teacherId } = req.body;
-    const userId = req.user.id; // From auth middleware
+    const { user } = req;
+    const instituteId = user.role === 'admin' ? user._id : user.instituteId;
 
     if (!name) {
       return res.status(400).json({ message: 'Please provide a batch name' });
     }
-    if (req.user.role !== 'admin') {
+    if (user.role !== 'admin' && user.role !== 'superadmin') {
       // Teachers can only create batches for themselves
-      if (teacherId && teacherId !== userId) {
+      if (teacherId && teacherId !== user._id.toString()) {
         return res.status(403).json({ message: 'Teachers can only assign themselves to new batches' });
       }
     }
@@ -24,8 +25,9 @@ const createBatch = async (req, res) => {
     const batch = await Batch.create({
       name,
       timing,
-      teacherId: teacherId || userId, // Admin can assign, teacher self-assigns
-      students: []
+      teacherId: teacherId || user._id, // Admin can assign, teacher self-assigns
+      students: [],
+      instituteId
     });
 
     res.status(201).json(batch);
@@ -46,11 +48,17 @@ const createBatch = async (req, res) => {
 // @access  Private
 const getBatches = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const { user } = req;
     let query = {};
     
-    if (req.user.role === 'teacher') {
-      query = { teacherId: userId };
+    // 1. Institute Isolation
+    if (user.role !== 'superadmin') {
+      query.instituteId = user.role === 'admin' ? user._id : user.instituteId;
+    }
+
+    // 2. Teacher Role Isolation
+    if (user.role === 'teacher') {
+      query.teacherId = user._id;
     }
     
     const batches = await Batch.find(query).populate('students', 'name rollNumber').populate('teacherId', 'name');
@@ -65,10 +73,19 @@ const getBatches = async (req, res) => {
 // @access  Private
 const getBatchById = async (req, res) => {
   try {
+    const { user } = req;
     const batch = await Batch.findById(req.params.id).populate('students', 'name rollNumber');
     
     if (!batch) {
       return res.status(404).json({ message: 'Batch not found' });
+    }
+
+    // Institute Isolation Check
+    if (user.role !== 'superadmin') {
+      const targetInst = user.role === 'admin' ? user._id : user.instituteId;
+      if (batch.instituteId.toString() !== targetInst.toString()) {
+        return res.status(403).json({ message: 'Access denied: Not your institute batch' });
+      }
     }
 
     res.status(200).json(batch);
@@ -83,10 +100,18 @@ const getBatchById = async (req, res) => {
 const updateBatch = async (req, res) => {
   try {
     const { name, timing } = req.body;
+    const { user } = req;
 
     const batch = await Batch.findById(req.params.id);
+    if (!batch) return res.status(404).json({ message: 'Batch not found' });
 
-    if (req.user.role !== 'admin' && batch.teacherId.toString() !== req.user.id) {
+    // Institute Isolation
+    const targetInst = user.role === 'admin' ? user._id : user.instituteId;
+    if (user.role !== 'superadmin' && batch.instituteId.toString() !== targetInst.toString()) {
+      return res.status(403).json({ message: 'Access denied: Not your institute batch' });
+    }
+
+    if (user.role !== 'admin' && user.role !== 'superadmin' && batch.teacherId.toString() !== user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized to update this batch' });
     }
 
@@ -111,13 +136,20 @@ const updateBatch = async (req, res) => {
 // @access  Private
 const deleteBatch = async (req, res) => {
   try {
+    const { user } = req;
     const batch = await Batch.findById(req.params.id);
 
     if (!batch) {
       return res.status(404).json({ message: 'Batch not found' });
     }
 
-    if (req.user.role !== 'admin' && batch.teacherId.toString() !== req.user.id) {
+    // Institute Isolation
+    const targetInst = user.role === 'admin' ? user._id : user.instituteId;
+    if (user.role !== 'superadmin' && batch.instituteId.toString() !== targetInst.toString()) {
+      return res.status(403).json({ message: 'Access denied: Not your institute batch' });
+    }
+
+    if (user.role !== 'admin' && user.role !== 'superadmin' && batch.teacherId.toString() !== user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized to delete this batch' });
     }
 
@@ -142,6 +174,7 @@ const assignStudentToBatch = async (req, res) => {
   try {
     const { studentId } = req.body;
     const batchId = req.params.id;
+    const { user } = req;
 
     if (!studentId) {
       return res.status(400).json({ message: 'Please provide a studentId' });
@@ -152,13 +185,15 @@ const assignStudentToBatch = async (req, res) => {
       return res.status(404).json({ message: 'Batch not found' });
     }
 
-    if (req.user.role !== 'admin' && batch.teacherId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to modify this batch' });
+    // Institute Isolation
+    const targetInst = user.role === 'admin' ? user._id : user.instituteId;
+    if (user.role !== 'superadmin' && batch.instituteId.toString() !== targetInst.toString()) {
+      return res.status(403).json({ message: 'Access denied: Not your institute batch' });
     }
 
     const student = await Student.findById(studentId);
-    if (!student) {
-      return res.status(404).json({ message: 'Student not found' });
+    if (!student || (user.role !== 'superadmin' && student.instituteId.toString() !== targetInst.toString())) {
+      return res.status(404).json({ message: 'Student not found in your institute' });
     }
 
     // We no longer remove them from other batches (Multi-Batch feature)

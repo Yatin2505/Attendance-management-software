@@ -21,6 +21,16 @@ const createLeaveRequest = async (req, res) => {
       return res.status(400).json({ message: 'Please provide all required fields' });
     }
 
+    const batch = await Batch.findById(batchId);
+    if (!batch) return res.status(404).json({ message: 'Batch not found' });
+
+    // Institute Isolation
+    const { user } = req;
+    const instituteId = batch.instituteId;
+    if (user.role !== 'superadmin' && instituteId.toString() !== (user.role === 'admin' ? user._id : user.instituteId).toString()) {
+      return res.status(403).json({ message: 'Access denied: Batch belongs to another institute' });
+    }
+
     const leaveRequest = await LeaveRequest.create({
       studentId,
       batchId,
@@ -28,7 +38,8 @@ const createLeaveRequest = async (req, res) => {
       endDate: toUTCMidnight(endDate),
       type,
       reason,
-      status: 'pending'
+      status: 'pending',
+      instituteId
     });
 
     res.status(201).json(leaveRequest);
@@ -43,7 +54,13 @@ const createLeaveRequest = async (req, res) => {
 const getLeaveRequests = async (req, res) => {
   try {
     const { status, batchId, studentId } = req.query;
+    const { user } = req;
     let query = {};
+
+    // 1. Institute Isolation
+    if (user.role !== 'superadmin') {
+      query.instituteId = user.role === 'admin' ? user._id : user.instituteId;
+    }
 
     if (status) query.status = status;
     if (batchId) query.batchId = batchId;
@@ -114,7 +131,8 @@ const updateLeaveStatus = async (req, res) => {
                 leaveType: leaveRequest.type,
                 leaveRequestId: leaveRequest._id,
                 teacherId: req.user.id,
-                notes: `System marked: ${leaveRequest.type} - ${leaveRequest.reason}`
+                notes: `System marked: ${leaveRequest.type} - ${leaveRequest.reason}`,
+                instituteId: leaveRequest.instituteId
               }
             },
             upsert: true

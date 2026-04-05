@@ -11,9 +11,15 @@ const toUTCMidnight = (dateInput) => {
 
 // Helper: check if a user can access a batch
 const canAccessBatch = (user, batch) => {
-  if (user.role === 'admin') return true;
-  if (!batch.teacherId) return false;
-  return batch.teacherId.toString() === user._id.toString();
+  if (user.role === 'superadmin') return true;
+  if (user.role === 'admin') {
+    return batch.instituteId.toString() === user._id.toString();
+  }
+  if (user.role === 'teacher') {
+    return batch.teacherId?.toString() === user._id.toString() && 
+           batch.instituteId?.toString() === user.instituteId.toString();
+  }
+  return false;
 };
 
 // @desc    Mark attendance for a student (upsert — creates or updates)
@@ -39,6 +45,7 @@ const markAttendance = async (req, res) => {
     }
 
     const attendanceDate = toUTCMidnight(date);
+    const instituteId = batch.instituteId;
 
     // Upsert: update if exists, create if not — avoids duplicate key errors
     const attendance = await Attendance.findOneAndUpdate(
@@ -48,7 +55,8 @@ const markAttendance = async (req, res) => {
           status,
           teacherId: req.user.id,
           leaveType: req.body.leaveType || undefined,
-          notes: notes || ''
+          notes: notes || '',
+          instituteId
         }
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -91,6 +99,7 @@ const markAllPresent = async (req, res) => {
     }
 
     const attendanceDate = toUTCMidnight(date);
+    const instituteId = batch.instituteId;
     const results = [];
 
     for (const student of batch.students) {
@@ -100,7 +109,8 @@ const markAllPresent = async (req, res) => {
           $setOnInsert: {
             status: 'present',
             teacherId: req.user.id,
-            notes: ''
+            notes: '',
+            instituteId
           }
         },
         { upsert: true, new: true }
@@ -144,6 +154,7 @@ const markAttendanceBulk = async (req, res) => {
     }
 
     const attendanceDate = toUTCMidnight(date);
+    const instituteId = batch.instituteId;
 
     const bulkOps = records.map(({ studentId, status, notes, leaveType }) => ({
       updateOne: {
@@ -153,7 +164,8 @@ const markAttendanceBulk = async (req, res) => {
             status,
             teacherId: req.user.id,
             leaveType: leaveType || undefined,
-            notes: notes || ''
+            notes: notes || '',
+            instituteId
           }
         },
         upsert: true
@@ -187,16 +199,21 @@ const markAttendanceBulk = async (req, res) => {
 const getAttendance = async (req, res) => {
   try {
     const { date, batchId, studentId } = req.query;
-
+    const { user } = req;
     let query = {};
 
-    // Teacher scope isolation
-    if (req.user.role === 'teacher') {
-      const myBatches = await Batch.find({ teacherId: req.user.id }).select('_id');
+    // 1. Institute Isolation
+    if (user.role !== 'superadmin') {
+      query.instituteId = user.role === 'admin' ? user._id : user.instituteId;
+    }
+
+    // 2. Teacher scope isolation
+    if (user.role === 'teacher') {
+      const myBatches = await Batch.find({ teacherId: user._id }).select('_id');
       const myBatchIds = myBatches.map(b => b._id.toString());
 
       if (myBatchIds.length === 0) {
-        return res.status(200).json([]); // No assigned batches — return empty, not 403
+        return res.status(200).json([]); 
       }
 
       if (batchId && !myBatchIds.includes(batchId)) {
@@ -309,6 +326,7 @@ const deleteAttendance = async (req, res) => {
 const getAttendanceTrends = async (req, res) => {
   try {
     const { days = 30 } = req.query;
+    const { user } = req;
     
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - parseInt(days));
@@ -316,9 +334,14 @@ const getAttendanceTrends = async (req, res) => {
 
     let matchQuery = { date: { $gte: startDate } };
 
-    // Teacher isolation check
-    if (req.user.role === 'teacher') {
-      const myBatches = await Batch.find({ teacherId: req.user.id }).select('_id');
+    // 1. Institute Isolation
+    if (user.role !== 'superadmin') {
+      matchQuery.instituteId = user.role === 'admin' ? user._id : user.instituteId;
+    }
+
+    // 2. Teacher isolation check
+    if (user.role === 'teacher') {
+      const myBatches = await Batch.find({ teacherId: user._id }).select('_id');
       matchQuery.batchId = { $in: myBatches.map(b => b._id) };
     }
 

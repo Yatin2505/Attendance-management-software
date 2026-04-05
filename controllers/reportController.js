@@ -15,10 +15,26 @@ const getPercentage = (present, total) => {
 const getStudentReport = async (req, res) => {
   try {
     const studentId = req.params.id;
-
+    const { user } = req;
     const studentIdObj = new mongoose.Types.ObjectId(studentId);
 
+    // 1. Student Ownership Check
+    const studentObj = await Student.findById(studentId).select('name rollNumber instituteId');
+    if (!studentObj) return res.status(404).json({ message: 'Student not found' });
+    
+    if (user.role !== 'superadmin') {
+      const myInst = user.role === 'admin' ? user._id : user.instituteId;
+      if (studentObj.instituteId.toString() !== myInst.toString()) {
+        return res.status(403).json({ message: 'Access denied: Not your student' });
+      }
+    }
+
     const matchStage = { $match: { studentId: studentIdObj } };
+    
+    // Add instituteId to match stage for safety
+    if (user.role !== 'superadmin') {
+      matchStage.$match.instituteId = user.role === 'admin' ? user._id : user.instituteId;
+    }
     
     // Aggregate attendance grouped by Batch
     const report = await Attendance.aggregate([
@@ -81,10 +97,8 @@ const getStudentReport = async (req, res) => {
       };
     });
 
-    const student = await Student.findById(studentId).select('name rollNumber');
-
     res.status(200).json({
-      student,
+      student: studentObj,
       stats: {
         totalDays:   globalTotal,
         presentDays: globalPresent,
@@ -105,10 +119,27 @@ const getStudentReport = async (req, res) => {
 const getBatchReport = async (req, res) => {
   try {
     const batchId = req.params.batchId;
+    const { user } = req;
     const batchIdObj = new mongoose.Types.ObjectId(batchId);
 
+    // 1. Batch Ownership Check
+    const batchObj = await Batch.findById(batchId).select('name timing instituteId');
+    if (!batchObj) return res.status(404).json({ message: 'Batch not found' });
+
+    if (user.role !== 'superadmin') {
+      const myInst = user.role === 'admin' ? user._id : user.instituteId;
+      if (batchObj.instituteId.toString() !== myInst.toString()) {
+        return res.status(403).json({ message: 'Access denied: Not your batch' });
+      }
+    }
+
+    const matchQuery = { batchId: batchIdObj };
+    if (user.role !== 'superadmin') {
+      matchQuery.instituteId = user.role === 'admin' ? user._id : user.instituteId;
+    }
+
     const report = await Attendance.aggregate([
-      { $match: { batchId: batchIdObj } },
+      { $match: matchQuery },
       {
         $group: {
           _id: '$studentId',
@@ -156,10 +187,8 @@ const getBatchReport = async (req, res) => {
       percentage: Number((r.percentage || 0).toFixed(2))
     }));
 
-    const batch = await Batch.findById(batchId).select('name timing');
-
     res.status(200).json({
-      batch,
+      batch: batchObj,
       studentsReport: formattedReport
     });
   } catch (error) {
@@ -173,6 +202,7 @@ const getBatchReport = async (req, res) => {
 const getMonthlyReport = async (req, res) => {
   try {
     const { month, year, batchId } = req.query;
+    const { user } = req;
 
     if (!month || !year) {
       return res.status(400).json({ message: 'Please provide month (1-12) and year' });
@@ -185,6 +215,11 @@ const getMonthlyReport = async (req, res) => {
     const matchQuery = {
       date: { $gte: startDate, $lte: endDate }
     };
+
+    // 1. Institute Isolation
+    if (user.role !== 'superadmin') {
+      matchQuery.instituteId = user.role === 'admin' ? user._id : user.instituteId;
+    }
 
     if (batchId) {
       matchQuery.batchId = new mongoose.Types.ObjectId(batchId);
@@ -252,6 +287,7 @@ const getMonthlyReport = async (req, res) => {
 const getDateRangeReport = async (req, res) => {
   try {
     const { from, to, batchId } = req.query;
+    const { user } = req;
 
     if (!from || !to) {
       return res.status(400).json({ message: 'Please provide from and to dates (YYYY-MM-DD)' });
@@ -266,6 +302,11 @@ const getDateRangeReport = async (req, res) => {
     const matchQuery = {
       date: { $gte: startDate, $lte: endDate }
     };
+
+    // 1. Institute Isolation
+    if (user.role !== 'superadmin') {
+      matchQuery.instituteId = user.role === 'admin' ? user._id : user.instituteId;
+    }
 
     if (batchId) {
       matchQuery.batchId = new mongoose.Types.ObjectId(batchId);

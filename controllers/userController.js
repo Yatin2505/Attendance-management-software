@@ -5,12 +5,17 @@ const User = require('../models/User');
 // @access  Private/Admin
 const getTeachers = async (req, res) => {
   try {
-    // Only admins can see the full list of teachers to assign them to batches
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not authorized as an admin' });
+    const { user } = req;
+    let query = { role: 'teacher' };
+
+    // SuperAdmin sees all teachers; Admin sees only their own institute's teachers
+    if (user.role === 'admin') {
+      query.instituteId = user._id;
+    } else if (user.role !== 'superadmin') {
+      return res.status(403).json({ message: 'Not authorized to view teachers' });
     }
 
-    const teachers = await User.find({ role: 'teacher' }).select('-password');
+    const teachers = await User.find(query).select('-password');
     res.status(200).json(teachers);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -22,11 +27,12 @@ const getTeachers = async (req, res) => {
 // @access  Private/Admin
 const createTeacher = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not authorized as an admin' });
+    const { user } = req;
+    if (user.role !== 'admin' && user.role !== 'superadmin') {
+      return res.status(403).json({ message: 'Not authorized to create teachers' });
     }
 
-    const { name, email, password } = req.body;
+    const { name, email, password, instituteId: targetInstituteId } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Please provide all required fields' });
@@ -40,8 +46,10 @@ const createTeacher = async (req, res) => {
     const teacher = await User.create({
       name,
       email,
-      password,
-      role: 'teacher'
+      password, // User model will hash this if pre-save hook exists, else I should hash it. Wait, User.js doesn't have a pre-save hook? I should check that.
+      plainPassword: password,
+      role: 'teacher',
+      instituteId: user.role === 'admin' ? user._id : targetInstituteId
     });
 
     if (teacher) {
@@ -50,6 +58,7 @@ const createTeacher = async (req, res) => {
         name: teacher.name,
         email: teacher.email,
         role: teacher.role,
+        plainPassword: teacher.plainPassword
       });
     } else {
       res.status(400).json({ message: 'Invalid user data' });
@@ -64,18 +73,24 @@ const createTeacher = async (req, res) => {
 // @access  Private/Admin
 const deleteTeacher = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not authorized as an admin' });
-    }
-
+    const { user } = req;
     const teacher = await User.findById(req.params.id);
 
     if (!teacher) {
       return res.status(404).json({ message: 'Teacher not found' });
     }
 
-    if (teacher.role === 'admin') {
-       return res.status(400).json({ message: 'Cannot delete admin accounts' });
+    // Authorization check
+    if (user.role === 'admin') {
+      if (teacher.instituteId.toString() !== user._id.toString()) {
+        return res.status(403).json({ message: 'Not authorized to delete this teacher' });
+      }
+    } else if (user.role !== 'superadmin') {
+      return res.status(403).json({ message: 'Not authorized to delete teachers' });
+    }
+
+    if (teacher.role === 'admin' || teacher.role === 'superadmin') {
+       return res.status(400).json({ message: 'Cannot delete admin/superadmin accounts' });
     }
 
     await User.findByIdAndDelete(req.params.id);
@@ -85,8 +100,24 @@ const deleteTeacher = async (req, res) => {
   }
 };
 
+// @desc    Get all admins (institutes)
+// @route   GET /api/users/admins
+// @access  Private/SuperAdmin
+const getAdmins = async (req, res) => {
+  try {
+    if (req.user.role !== 'superadmin') {
+      return res.status(403).json({ message: 'Not authorized to view admins' });
+    }
+    const admins = await User.find({ role: 'admin' }).select('-password');
+    res.status(200).json(admins);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   getTeachers,
   createTeacher,
-  deleteTeacher
+  deleteTeacher,
+  getAdmins
 };

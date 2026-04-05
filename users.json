@@ -1,0 +1,27 @@
+[
+  {
+    "_id": "69d157c11ccdbd5fc0df37e9",
+    "email": "admin@audit.com",
+    "role": "admin"
+  },
+  {
+    "_id": "69d158c91ccdbd5fc0df3829",
+    "email": "teacher@audit.com",
+    "role": "teacher"
+  },
+  {
+    "_id": "69d1605872685da26132e091",
+    "email": "teacher1@audit.com",
+    "role": "teacher"
+  },
+  {
+    "_id": "69d1674e72685da26132e1eb",
+    "email": "student@audit.com",
+    "role": "student"
+  },
+  {
+    "_id": "69d1ddb8e57c2d5ef3f6ccc9",
+    "email": "admin@gmail.com",
+    "role": "admin"
+  }
+]

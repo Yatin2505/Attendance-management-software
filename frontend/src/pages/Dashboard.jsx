@@ -117,7 +117,8 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const isSuper = user?.role === 'superadmin';
 
   useEffect(() => {
     (async () => {
@@ -197,7 +198,7 @@ const Dashboard = () => {
         className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
       >
         <div>
-          <h1 className="text-2xl font-display font-bold text-slate-900 dark:text-white">Dashboard</h1>
+          <h1 className="text-2xl font-display font-bold text-slate-900 dark:text-white">{isSuper ? 'Global Dashboard' : 'Dashboard'}</h1>
           <p className="text-sm text-slate-400 dark:text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
             <Calendar className="w-3.5 h-3.5" />{today}
           </p>
@@ -210,7 +211,7 @@ const Dashboard = () => {
                 : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
               }`}>
               <TrendingUp className="w-3.5 h-3.5" />
-              {overall.percentage}% Overall
+              {overall.percentage}% {isSuper ? 'Global' : 'Overall'}
             </span>
           )}
         </div>
@@ -294,7 +295,7 @@ const Dashboard = () => {
           className="lg:col-span-3 premium-card p-5 flex flex-col"
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-display font-bold text-slate-800 dark:text-white">Monthly Attendance %</h2>
+            <h2 className="text-base font-display font-bold text-slate-800 dark:text-white">{isSuper ? 'Global Attendance %' : 'Monthly Attendance %'}</h2>
             <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg">Last 30 days</span>
           </div>
 

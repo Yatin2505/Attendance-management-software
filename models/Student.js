@@ -15,7 +15,12 @@ const studentSchema = new mongoose.Schema({
   batches: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Batch'
-  }]
+  }],
+  instituteId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  }
 }, {
   timestamps: true
 });

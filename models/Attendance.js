@@ -39,6 +39,11 @@ const attendanceSchema = new mongoose.Schema({
   notes: {
     type: String,
     default: ''
+  },
+  instituteId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   }
 }, {
   timestamps: true
