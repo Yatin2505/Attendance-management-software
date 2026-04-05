@@ -11,9 +11,22 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const cachedUser = getCurrentUser();
-    if (cachedUser) setUser(cachedUser);
-    setLoading(false);
+    const fetchUser = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const profile = await getMe();
+          setUser(profile);
+          localStorage.setItem('user', JSON.stringify(profile));
+        } catch (err) {
+          console.error("Failed to fetch fresh profile", err);
+          const cachedUser = getCurrentUser();
+          if (cachedUser) setUser(cachedUser);
+        }
+      }
+      setLoading(false);
+    };
+    fetchUser();
   }, []);
 
   const login = async (email, password) => {
