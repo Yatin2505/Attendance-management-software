@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
@@ -14,6 +14,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
 import LeaveManagement from './pages/LeaveManagement';
+import Fees from './pages/Fees';
 import StudentFees from './pages/StudentFees';
 import Institutes from './pages/Institutes';
 
