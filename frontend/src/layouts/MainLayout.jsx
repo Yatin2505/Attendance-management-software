@@ -89,7 +89,7 @@ const MainLayout = () => {
 
   return (
     <div 
-      className="flex h-screen bg-mesh-light dark:bg-mesh-dark font-sans overflow-hidden transition-colors duration-500"
+      className="flex h-screen bg-mesh-light font-sans overflow-hidden transition-colors duration-500"
       style={{ '--primary-500': brandColor }}
     >
 

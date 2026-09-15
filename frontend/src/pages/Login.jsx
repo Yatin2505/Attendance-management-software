@@ -55,10 +55,10 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-950 font-sans overflow-hidden">
+    <div className="min-h-screen flex bg-slate-50 font-sans overflow-hidden">
       
       {/* Left Panel: Branding & Abstract Art */}
-      <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-16 bg-mesh-dark">
+      <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-16 bg-slate-900">
         {/* Animated Background Elements */}
         <div className="absolute top-20 left-20 w-72 h-72 bg-primary-600/30 rounded-full mix-blend-screen filter blur-3xl animate-blob" />
         <div className="absolute top-40 right-20 w-72 h-72 bg-accent-500/30 rounded-full mix-blend-screen filter blur-3xl animate-blob animation-delay-2000" />
