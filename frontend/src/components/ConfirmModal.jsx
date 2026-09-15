@@ -43,28 +43,28 @@ const ConfirmModal = ({
             initial={{ scale: 0.92, opacity: 0, y: 12 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.92, opacity: 0, y: 12 }}
-            className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 max-w-sm w-full p-6"
+            className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-sm w-full p-6"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-start gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+              <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
               </div>
               <div>
-                <h3 className="text-base font-display font-bold text-slate-900 dark:text-white">{title}</h3>
+                <h3 className="text-base font-display font-bold text-slate-900">{title}</h3>
                 <p className="text-xs text-slate-400 mt-0.5">This action cannot be undone</p>
               </div>
             </div>
 
             {message && (
-              <p className="text-sm text-slate-600 dark:text-slate-300 mb-5 leading-relaxed">{message}</p>
+              <p className="text-sm text-slate-600 mb-5 leading-relaxed">{message}</p>
             )}
 
             <div className="flex gap-3">
               <button
                 onClick={onCancel}
                 disabled={processing}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition disabled:opacity-50"
               >
                 Cancel
               </button>

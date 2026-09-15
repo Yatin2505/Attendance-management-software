@@ -2,6 +2,12 @@
 
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root, html, body {
+  color-scheme: light !important;
+}
+
 :root {
   --primary-900: #1e3a8a;
   --primary-600: #2563eb;
