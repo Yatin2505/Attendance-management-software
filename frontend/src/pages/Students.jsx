@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import {
   getStudents, createStudent, updateStudent,
   deleteStudent, importStudents,
@@ -622,12 +623,22 @@ const Students = () => {
 
                 {/* Batch assignment */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5" /> Assign to Batches
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5" /> Assign to Batches
+                    </label>
+                    <Link to="/batches" className="text-xs font-bold text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-0.5">
+                      <Plus className="w-3 h-3" /> Add Batch
+                    </Link>
+                  </div>
                   <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
                     {batches.length === 0 ? (
-                      <p className="text-xs text-slate-400 py-4 text-center">No batches — create one first</p>
+                      <div className="py-4 text-center space-y-2">
+                        <p className="text-xs text-slate-400">No batches created yet</p>
+                        <Link to="/batches" className="inline-flex items-center gap-1 text-xs font-bold text-primary-600 bg-primary-50 px-3 py-1.5 rounded-xl border border-primary-100 hover:bg-primary-100 transition-all">
+                          <Plus className="w-3.5 h-3.5" /> Create New Batch
+                        </Link>
+                      </div>
                     ) : batches.map(batch => {
                       const checked = formData.batches.includes(batch._id);
                       return (

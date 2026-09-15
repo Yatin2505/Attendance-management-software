@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { getBatches, getBatchById } from '../services/batchService';
 import { getAttendance, markAttendanceBulk } from '../services/attendanceService';
 import toast from 'react-hot-toast';
@@ -6,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Users, CheckCircle, XCircle, Clock, Save,
   CheckSquare, Inbox, Search, Filter, ChevronDown, Zap,
-  UserCheck, AlertCircle
+  UserCheck, AlertCircle, Plus
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -302,22 +303,32 @@ const Attendance = () => {
               />
             </div>
 
-            {/* Batch */}
-            <div className="relative flex-1 sm:flex-none sm:w-52">
-              <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-              <select
-                id="att-batch"
-                value={selectedBatchId}
-                onChange={e => setSelectedBatchId(e.target.value)}
-                disabled={loadingBatches || isSaving || loadingData}
-                className="w-full pl-9 pr-8 py-2.5 rounded-xl text-sm font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/40 transition-all appearance-none"
+            {/* Batch Select + Quick Add */}
+            <div className="flex items-center gap-1.5 flex-1 sm:flex-none">
+              <div className="relative flex-1 sm:w-52">
+                <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <select
+                  id="att-batch"
+                  value={selectedBatchId}
+                  onChange={e => setSelectedBatchId(e.target.value)}
+                  disabled={loadingBatches || isSaving || loadingData}
+                  className="w-full pl-9 pr-8 py-2.5 rounded-xl text-sm font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/40 transition-all appearance-none"
+                >
+                  <option value="">{loadingBatches ? 'Loading…' : 'Select Batch…'}</option>
+                  {batches.map(b => (
+                    <option key={b._id} value={b._id}>{b.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
+              <Link
+                to="/batches"
+                className="flex items-center gap-1 px-3 py-2.5 rounded-xl text-xs font-bold bg-primary-50 text-primary-600 border border-primary-100 hover:bg-primary-100 transition-all whitespace-nowrap"
+                title="Create New Batch"
               >
-                <option value="">{loadingBatches ? 'Loading…' : 'Select Batch…'}</option>
-                {batches.map(b => (
-                  <option key={b._id} value={b._id}>{b.name}</option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Batch</span>
+              </Link>
             </div>
 
             {/* Mark All Present */}

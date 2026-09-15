@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import {
   getBatches, createBatch, updateBatch, deleteBatch,
   assignStudentToBatch, removeStudentFromBatch, getBatchStats
@@ -389,12 +390,12 @@ const Batches = () => {
                         )}
 
                         {/* Enroll student row */}
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
                           <select
                             value={selStudent}
                             onChange={e => setSelStudent(e.target.value)}
                             disabled={processing}
-                            className="flex-1 px-3.5 py-2.5 rounded-xl text-sm font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-500/40 transition"
+                            className="flex-1 min-w-[200px] px-3.5 py-2.5 rounded-xl text-sm font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-500/40 transition"
                           >
                             <option value="">Select student to enroll…</option>
                             {getAvailableStudents(batch.students).map(s => (
@@ -409,6 +410,14 @@ const Batches = () => {
                             <UserPlus className="w-4 h-4" />
                             {processing ? 'Adding…' : 'Enroll'}
                           </button>
+                          <Link
+                            to="/students"
+                            className="flex items-center gap-1 px-3 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition whitespace-nowrap"
+                            title="Create new student"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Student</span>
+                          </Link>
                         </div>
 
                         {/* Students table */}
@@ -516,9 +525,14 @@ const Batches = () => {
 
                 {isAdmin && (
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-                      <GraduationCap className="w-3.5 h-3.5" /> Assign Teacher
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+                        <GraduationCap className="w-3.5 h-3.5 text-primary-500" /> Assign Teacher
+                      </label>
+                      <Link to="/teachers" className="text-xs font-bold text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-0.5">
+                        <Plus className="w-3 h-3" /> Add Teacher
+                      </Link>
+                    </div>
                     <select
                       value={formData.teacherId}
                       onChange={e => setFormData({ ...formData, teacherId: e.target.value })}

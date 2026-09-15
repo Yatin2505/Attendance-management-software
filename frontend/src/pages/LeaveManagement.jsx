@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Calendar, Search, Filter, CheckCircle, XCircle, Clock, 
@@ -304,7 +305,12 @@ const LeaveManagement = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Batch Select */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Batch</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Batch</label>
+                      <Link to="/batches" className="text-xs font-bold text-primary-600 hover:underline flex items-center gap-0.5">
+                        <Plus className="w-3 h-3" /> Add Batch
+                      </Link>
+                    </div>
                     <select
                       required
                       value={formData.batchId}
@@ -319,7 +325,12 @@ const LeaveManagement = () => {
                   </div>
                   {/* Student Select */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Student</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Student</label>
+                      <Link to="/students" className="text-xs font-bold text-primary-600 hover:underline flex items-center gap-0.5">
+                        <Plus className="w-3 h-3" /> Add Student
+                      </Link>
+                    </div>
                     <select
                       required
                       disabled={!formData.batchId}

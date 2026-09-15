@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Wallet, Plus, Users, Search, Filter,
@@ -389,7 +390,12 @@ const Fees = () => {
                 <div className="grid grid-cols-2 gap-4">
                   {assignType === 'individual' ? (
                     <div className="col-span-2">
-                       <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Select Student</label>
+                       <div className="flex items-center justify-between mb-1.5">
+                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Select Student</label>
+                         <Link to="/students" className="text-xs font-bold text-primary-600 hover:underline flex items-center gap-0.5">
+                           <Plus className="w-3 h-3" /> Add Student
+                         </Link>
+                       </div>
                        <select 
                         required value={newFee.studentId} onChange={e => setNewFee({...newFee, studentId: e.target.value})}
                         className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm"
@@ -400,7 +406,12 @@ const Fees = () => {
                     </div>
                   ) : (
                     <div className="col-span-2">
-                       <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Select Batch</label>
+                       <div className="flex items-center justify-between mb-1.5">
+                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Select Batch</label>
+                         <Link to="/batches" className="text-xs font-bold text-primary-600 hover:underline flex items-center gap-0.5">
+                           <Plus className="w-3 h-3" /> Add Batch
+                         </Link>
+                       </div>
                        <select 
                         required value={newFee.batchId} onChange={e => setNewFee({...newFee, batchId: e.target.value})}
                         className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm"

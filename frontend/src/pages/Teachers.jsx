@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { userService } from '../services/userService';
 import { getBatches, updateBatch } from '../services/batchService';
 import toast from 'react-hot-toast';
@@ -107,14 +108,24 @@ const AssignBatchesModal = ({ teacher, allBatches, onClose, onSave }) => {
             <h3 className="text-base font-display font-bold text-slate-900 dark:text-white">Assign Batches</h3>
             <p className="text-xs text-slate-400 mt-0.5">{teacher.name}</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 transition">
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <Link to="/batches" className="text-xs font-bold text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-0.5">
+              <Plus className="w-3.5 h-3.5" /> Add Batch
+            </Link>
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 transition">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         <div className="p-5">
           {allBatches.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-6">No batches created yet.</p>
+            <div className="py-6 text-center space-y-2">
+              <p className="text-sm text-slate-400">No batches created yet.</p>
+              <Link to="/batches" className="inline-flex items-center gap-1 text-xs font-bold text-primary-600 bg-primary-50 px-3 py-1.5 rounded-xl border border-primary-100 hover:bg-primary-100 transition-all">
+                <Plus className="w-3.5 h-3.5" /> Create New Batch
+              </Link>
+            </div>
           ) : (
             <div className="space-y-2 max-h-72 overflow-y-auto pr-1 custom-scrollbar">
               {allBatches.map(b => {
