@@ -5,7 +5,7 @@ import {
   Wallet, Plus, Users, Search, Filter,
   CheckCircle, Clock, AlertCircle, X,
   TrendingUp, ArrowRight, Download, CreditCard,
-  Calendar, Layers, RefreshCw, MoreVertical, DollarSign, Edit2, Trash2
+  Calendar, Layers, RefreshCw, MoreVertical, DollarSign, Edit2, Trash2, FileText, Receipt, Printer
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -17,6 +17,7 @@ import {
 import { getStudents } from '../services/studentService';
 import { getBatches } from '../services/batchService';
 import ConfirmModal from '../components/ConfirmModal';
+import InvoiceModal from '../components/InvoiceModal';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', {
@@ -58,6 +59,12 @@ const Fees = () => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [assignType, setAssignType] = useState('individual'); // 'individual' or 'batch'
   
+  // Invoices & Payment History
+  const [activeInvoice, setActiveInvoice] = useState(null);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [selectedFeeForHistory, setSelectedFeeForHistory] = useState(null);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+
   const [newFee, setNewFee] = useState({
     studentId: '', batchId: '', amount: '', month: new Date().toLocaleString('en-US', { month: 'long' }),
     year: new Date().getFullYear(), dueDate: '', description: 'Monthly Tuition Fee'
@@ -141,7 +148,7 @@ const Fees = () => {
 
     setProcessing(true);
     try {
-      await recordPayment(paymentData.feeId, {
+      const res = await recordPayment(paymentData.feeId, {
         amount: payAmt,
         paymentMethod: paymentData.method,
         remarks: paymentData.remarks
@@ -149,11 +156,43 @@ const Fees = () => {
       toast.success('Payment recorded successfully');
       setIsPaymentModalOpen(false);
       fetchInitialData();
+
+      // Automatically show the generated invoice for instant preview & download!
+      if (res?.invoice) {
+        setActiveInvoice(res.invoice);
+        setIsInvoiceModalOpen(true);
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to record payment');
     } finally {
       setProcessing(false);
     }
+  };
+
+  const handleViewInvoice = (fee, payment) => {
+    const pDate = payment.paymentDate || fee.createdAt || new Date();
+    const dateFormatted = new Date(pDate).toISOString().slice(0, 10).replace(/-/g, '');
+    const randSuffix = payment._id ? payment._id.toString().slice(-4).toUpperCase() : Math.floor(1000 + Math.random() * 9000);
+    const invoiceNum = payment.invoiceNumber || `INV-${dateFormatted}-${randSuffix}`;
+
+    setActiveInvoice({
+      invoiceNumber: invoiceNum,
+      paymentId: payment._id,
+      amount: payment.amount,
+      previousPaid: payment.previousPaid ?? 0,
+      balanceAfter: payment.balanceAfter ?? Math.max(0, fee.amount - fee.paidAmount),
+      paymentDate: pDate,
+      paymentMethod: payment.paymentMethod || 'Cash',
+      remarks: payment.remarks || '',
+      month: fee.month,
+      year: fee.year,
+      totalAmount: fee.amount,
+      status: fee.status,
+      description: fee.description,
+      student: fee.studentId,
+      institute: fee.instituteId
+    });
+    setIsInvoiceModalOpen(true);
   };
 
   const handleEditFee = async (e) => {
@@ -347,6 +386,16 @@ const Fees = () => {
                           <Wallet className="w-4 h-4" />
                         </button>
                       )}
+                      <button 
+                        onClick={() => {
+                          setSelectedFeeForHistory(fee);
+                          setIsHistoryModalOpen(true);
+                        }}
+                        className="p-2 bg-blue-500/10 text-blue-600 hover:bg-blue-500 hover:text-white rounded-lg transition-all"
+                        title="View Payment Invoices & History"
+                      >
+                        <FileText className="w-4 h-4" />
+                      </button>
                       <button 
                         onClick={() => {
                           setEditFee({ ...fee });
@@ -622,6 +671,77 @@ const Fees = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Payment History & Invoices Modal */}
+      <AnimatePresence>
+        {isHistoryModalOpen && selectedFeeForHistory && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10"
+            >
+              <div className="px-6 py-4 bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 flex justify-between items-center">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-primary-500" />
+                    Payment History & Invoices
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {selectedFeeForHistory.studentId?.name} · {selectedFeeForHistory.month} {selectedFeeForHistory.year}
+                  </p>
+                </div>
+                <button onClick={() => setIsHistoryModalOpen(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 max-h-[60vh] overflow-y-auto space-y-3">
+                {selectedFeeForHistory.paymentHistory && selectedFeeForHistory.paymentHistory.length > 0 ? (
+                  selectedFeeForHistory.paymentHistory.map((h, idx) => (
+                    <div key={idx} className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-900 dark:text-white">₹{Number(h.amount).toLocaleString()}</span>
+                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                            {h.paymentMethod}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          {fmtDate(h.paymentDate)} · Ref: <span className="font-semibold text-slate-600 dark:text-slate-300">{h.invoiceNumber || 'INV-' + (h._id?.toString().slice(-6).toUpperCase() || idx)}</span>
+                        </p>
+                        {h.remarks && <p className="text-[10px] text-slate-500 italic mt-0.5">Note: {h.remarks}</p>}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleViewInvoice(selectedFeeForHistory, h)}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Invoice
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 text-center text-slate-400 text-xs italic">
+                    No payment transactions recorded for this fee yet.
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Invoice Receipt Modal */}
+      <InvoiceModal
+        isOpen={isInvoiceModalOpen}
+        onClose={() => setIsInvoiceModalOpen(false)}
+        invoice={activeInvoice}
+      />
 
       <ConfirmModal 
         isOpen={!!deleteId}

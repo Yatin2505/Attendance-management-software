@@ -127,37 +127,81 @@ const recordPayment = async (req, res) => {
       });
     }
     
+    const previousPaid = fee.paidAmount;
     fee.paidAmount += payAmount;
-    fee.paymentHistory.push({
+    const balanceAfter = Math.max(0, fee.amount - fee.paidAmount);
+
+    // Generate unique invoice number: INV-YYYYMMDD-XXXX
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const randSuffix = Math.floor(1000 + Math.random() * 9000);
+    const invoiceNumber = `INV-${dateStr}-${randSuffix}`;
+
+    const paymentRecord = {
+      invoiceNumber,
       amount: payAmount, 
-      paymentMethod, 
-      remarks, 
-      paymentDate: new Date()
-    });
-    
+      previousPaid,
+      balanceAfter,
+      paymentMethod: paymentMethod || 'Cash', 
+      remarks: remarks || '', 
+      paymentDate: now,
+      collectedBy: user._id
+    };
+
+    fee.paymentHistory.push(paymentRecord);
     await fee.save();
+
+    // Populate for response & invoice generation
+    const populatedFee = await Fee.findById(fee._id)
+      .populate('studentId', 'name rollNumber contactNumber')
+      .populate('instituteId', 'name logo brandingColor email contactNumber');
+
+    const createdPayment = populatedFee.paymentHistory[populatedFee.paymentHistory.length - 1];
+
+    const invoicePayload = {
+      invoiceNumber: createdPayment.invoiceNumber || invoiceNumber,
+      paymentId: createdPayment._id,
+      amount: payAmount,
+      previousPaid,
+      balanceAfter,
+      paymentDate: createdPayment.paymentDate,
+      paymentMethod: createdPayment.paymentMethod,
+      remarks: createdPayment.remarks,
+      feeId: fee._id,
+      month: fee.month,
+      year: fee.year,
+      totalAmount: fee.amount,
+      status: fee.status,
+      description: fee.description,
+      dueDate: fee.dueDate,
+      student: populatedFee.studentId,
+      institute: populatedFee.instituteId
+    };
 
     // Notify student
     const feeUser = await User.findOne({ studentId: fee.studentId });
     if (feeUser) {
       await createNotification(
         feeUser._id,
-        'Payment Recorded',
-        `A payment of ₹${amount} for ${fee.month} ${fee.year} has been confirmed. Current status: ${fee.status}`,
+        'Payment Recorded & Invoice Generated',
+        `A payment of ₹${payAmount} (Invoice: ${invoiceNumber}) for ${fee.month} ${fee.year} has been confirmed. Current balance: ₹${balanceAfter}`,
         'success',
-        '/student/dashboard'
+        '/fees'
       );
     }
 
     // Notify Admins
-    const populatedFee = await Fee.findById(fee._id).populate('studentId');
     await notifyAdmins(
       'Payment Confirmed',
-      `Payment of ₹${amount} recorded for student ${populatedFee.studentId?.name || 'Unknown'}. Status: ${populatedFee.status}`,
+      `Payment of ₹${payAmount} (Invoice: ${invoiceNumber}) recorded for student ${populatedFee.studentId?.name || 'Unknown'}. Status: ${populatedFee.status}`,
       'success'
     );
 
-    res.status(200).json(fee);
+    res.status(200).json({
+      message: 'Payment recorded and invoice generated successfully',
+      fee: populatedFee,
+      invoice: invoicePayload
+    });
   } catch (error) {
     console.error('Payment recording error:', error);
     res.status(400).json({ message: error.message });
@@ -190,7 +234,8 @@ const getFees = async (req, res) => {
     }
     
     const fees = await Fee.find(query)
-      .populate('studentId', 'name rollNumber')
+      .populate('studentId', 'name rollNumber contactNumber')
+      .populate('instituteId', 'name logo brandingColor email contactNumber')
       .sort({ createdAt: -1 });
       
     res.status(200).json(fees);
@@ -208,6 +253,8 @@ const getMyFees = async (req, res) => {
     if (!studentId) return res.status(401).json({ message: 'No student linked to this account' });
     
     const fees = await Fee.find({ studentId })
+      .populate('studentId', 'name rollNumber contactNumber')
+      .populate('instituteId', 'name logo brandingColor email contactNumber')
       .sort({ createdAt: -1 });
       
     res.status(200).json(fees);

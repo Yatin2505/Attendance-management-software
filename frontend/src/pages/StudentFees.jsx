@@ -3,12 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Wallet, Receipt, CreditCard, Clock, 
   CheckCircle, AlertCircle, Download, ArrowLeft,
-  Calendar, RefreshCw, Info, ChevronRight, DollarSign
+  Calendar, RefreshCw, Info, ChevronRight, DollarSign, FileText
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { getMyFees } from '../services/feeService';
+import InvoiceModal from '../components/InvoiceModal';
 
 const fmt = (d) => new Date(d).toLocaleDateString('en-IN', {
   day: 'numeric', month: 'short', year: 'numeric'
@@ -31,6 +32,34 @@ const StudentFees = () => {
   const [fees, setFees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedFee, setExpandedFee] = useState(null);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+
+  const openStudentInvoice = (fee, payment) => {
+    const pDate = payment.paymentDate || fee.createdAt || new Date();
+    const dateFormatted = new Date(pDate).toISOString().slice(0, 10).replace(/-/g, '');
+    const randSuffix = payment._id ? payment._id.toString().slice(-4).toUpperCase() : 'REC';
+    const invoiceNum = payment.invoiceNumber || `INV-${dateFormatted}-${randSuffix}`;
+
+    setSelectedInvoice({
+      invoiceNumber: invoiceNum,
+      paymentId: payment._id,
+      amount: payment.amount,
+      previousPaid: payment.previousPaid ?? 0,
+      balanceAfter: payment.balanceAfter ?? Math.max(0, fee.amount - fee.paidAmount),
+      paymentDate: pDate,
+      paymentMethod: payment.paymentMethod || 'Cash',
+      remarks: payment.remarks || '',
+      month: fee.month,
+      year: fee.year,
+      totalAmount: fee.amount,
+      status: fee.status,
+      description: fee.description,
+      student: fee.studentId,
+      institute: fee.instituteId
+    });
+    setIsInvoiceModalOpen(true);
+  };
 
   useEffect(() => {
     fetchFees();
@@ -217,7 +246,18 @@ const StudentFees = () => {
                                   <p className="text-[10px] text-slate-400">{h.paymentMethod} · {fmt(h.paymentDate)}</p>
                                 </div>
                               </div>
-                              {h.remarks && <span className="text-[10px] text-slate-400 italic bg-slate-100 dark:bg-white/5 px-2 py-1 rounded-md max-w-[150px] truncate">{h.remarks}</span>}
+                              <div className="flex items-center gap-2">
+                                {h.remarks && <span className="text-[10px] text-slate-400 italic bg-slate-100 dark:bg-white/5 px-2 py-1 rounded-md max-w-[120px] truncate">{h.remarks}</span>}
+                                <button
+                                  type="button"
+                                  onClick={() => openStudentInvoice(fee, h)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 hover:bg-primary-100 text-primary-700 dark:bg-primary-500/10 dark:text-primary-400 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                                  title="Download Fee Invoice"
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                  Invoice
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -253,6 +293,13 @@ const StudentFees = () => {
           )}
         </div>
       </div>
+
+      {/* Invoice Receipt Modal */}
+      <InvoiceModal
+        isOpen={isInvoiceModalOpen}
+        onClose={() => setIsInvoiceModalOpen(false)}
+        invoice={selectedInvoice}
+      />
     </div>
   );
 };

@@ -1,9 +1,21 @@
 const mongoose = require('mongoose');
 
 const paymentHistorySchema = new mongoose.Schema({
+  invoiceNumber: {
+    type: String,
+    required: false
+  },
   amount: {
     type: Number,
     required: true
+  },
+  previousPaid: {
+    type: Number,
+    default: 0
+  },
+  balanceAfter: {
+    type: Number,
+    default: 0
   },
   paymentDate: {
     type: Date,
@@ -14,7 +26,12 @@ const paymentHistorySchema = new mongoose.Schema({
     enum: ['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'Bank', 'Other'],
     default: 'Cash'
   },
-  remarks: String
+  remarks: String,
+  collectedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false
+  }
 }, { _id: true });
 
 const feeSchema = new mongoose.Schema({
