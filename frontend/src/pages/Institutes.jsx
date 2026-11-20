@@ -4,6 +4,7 @@ import { getInstitutes, createInstitute, deleteInstitute, toggleInstituteStatus 
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import SearchBar from '../components/SearchBar';
+import ImageUpload from '../components/ImageUpload';
 import toast from 'react-hot-toast';
 
 const Institutes = () => {
@@ -218,15 +219,13 @@ const Institutes = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-700 dark:text-slate-300 ml-1">Branding Logo URL</label>
-              <input
-                type="url"
-                className="form-input"
-                placeholder="https://example.com/logo.png"
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+            <div>
+              <ImageUpload
+                label="Branding Logo"
                 value={newAdmin.logo}
-                onChange={(e) => setNewAdmin({ ...newAdmin, logo: e.target.value })}
+                onChange={(logo) => setNewAdmin({ ...newAdmin, logo })}
+                helperText="Upload institute logo from PC"
               />
             </div>
             <div className="space-y-1.5">

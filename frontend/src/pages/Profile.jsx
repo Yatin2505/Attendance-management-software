@@ -5,6 +5,7 @@ import { changePassword, updateProfile } from '../services/authService';
 import { updateInstituteBranding } from '../services/instituteService';
 import { getBatches } from '../services/batchService';
 import toast from 'react-hot-toast';
+import ImageUpload from '../components/ImageUpload';
 import {
   User, Mail, Shield, Key, Eye, EyeOff,
   CheckCircle, Layers, Calendar, Lock,
@@ -45,7 +46,7 @@ const InputField = ({ icon: Icon, label, value, onChange, placeholder, type = 't
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 const Profile = () => {
-  const { user, setUser } = useAuth();
+  const { user, setUser, updateUser } = useAuth();
 
   const isAdmin = user?.role === 'admin';
   const isSuperAdmin = user?.role === 'superadmin';
@@ -104,7 +105,11 @@ const Profile = () => {
     setProfileLoading(true);
     try {
       const updated = await updateProfile(profileForm);
-      if (setUser) setUser(prev => ({ ...prev, ...updated }));
+      if (updateUser) {
+        updateUser(updated);
+      } else if (setUser) {
+        setUser(prev => ({ ...prev, ...updated }));
+      }
       toast.success('Profile updated successfully!');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update profile');
@@ -119,8 +124,18 @@ const Profile = () => {
     setBrandingLoading(true);
     try {
       await updateInstituteBranding(brandingForm);
-      if (setUser) setUser(prev => ({ ...prev, name: brandingForm.name, logo: brandingForm.logo, brandingColor: brandingForm.brandingColor }));
-      toast.success('Institute branding updated! Reload to see sidebar changes.');
+      const updates = {
+        name: brandingForm.name,
+        logo: brandingForm.logo,
+        instituteLogo: brandingForm.logo,
+        brandingColor: brandingForm.brandingColor
+      };
+      if (updateUser) {
+        updateUser(updates);
+      } else if (setUser) {
+        setUser(prev => ({ ...prev, ...updates }));
+      }
+      toast.success('Institute branding updated successfully!');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update branding');
     } finally {
@@ -247,14 +262,8 @@ const Profile = () => {
           </h2>
           <form onSubmit={handleProfileSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <InputField icon={User} label="Display Name" value={profileForm.name} onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))} placeholder="Your full name" />
-            <InputField icon={Image} label="Profile Photo URL" value={profileForm.profilePhoto} onChange={e => setProfileForm(p => ({ ...p, profilePhoto: e.target.value }))} placeholder="https://..." />
+            <ImageUpload label="Profile Photo" value={profileForm.profilePhoto} onChange={photo => setProfileForm(p => ({ ...p, profilePhoto: photo }))} helperText="Upload JPG/PNG from your PC" />
             <InputField icon={Phone} label="Contact Number" value={profileForm.contactNumber} onChange={e => setProfileForm(p => ({ ...p, contactNumber: e.target.value }))} placeholder="+91 98765 43210" />
-            {profileForm.profilePhoto && (
-              <div className="sm:col-span-3 flex items-center gap-3">
-                <img src={profileForm.profilePhoto} alt="Preview" className="w-12 h-12 rounded-xl object-cover border border-slate-200 dark:border-slate-700" onError={e => e.target.style.display = 'none'} />
-                <p className="text-xs text-slate-400">Profile photo preview</p>
-              </div>
-            )}
             <div className="sm:col-span-3 flex justify-end">
               <button type="submit" disabled={profileLoading} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-sky-600 hover:bg-sky-700 text-white transition active:scale-95 disabled:opacity-60">
                 {profileLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
@@ -272,12 +281,12 @@ const Profile = () => {
             </h2>
             <form onSubmit={handleBrandingSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <InputField icon={Building2} label="Institute Name" value={brandingForm.name} onChange={e => setBrandingForm(p => ({ ...p, name: e.target.value }))} placeholder="Your Institute Name" />
-              <InputField icon={Image} label="Logo URL" value={brandingForm.logo} onChange={e => setBrandingForm(p => ({ ...p, logo: e.target.value }))} placeholder="https://..." />
+              <ImageUpload label="Institute Logo" value={brandingForm.logo} onChange={logo => setBrandingForm(p => ({ ...p, logo }))} helperText="Upload logo (PNG, JPG, SVG) from PC" />
               <div>
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">Brand Color</label>
                 <div className="flex items-center gap-2">
-                  <div className="relative flex-shrink-0">
-                    <Palette className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none z-10" />
+                  <div className="relative flex-1">
+                    <Palette className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none z-10" />
                     <input
                       type="text"
                       value={brandingForm.brandingColor}
@@ -289,13 +298,6 @@ const Profile = () => {
                   <input type="color" value={brandingForm.brandingColor} onChange={e => setBrandingForm(p => ({ ...p, brandingColor: e.target.value }))} className="w-10 h-10 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer flex-shrink-0 bg-transparent" />
                 </div>
               </div>
-              {brandingForm.logo && (
-                <div className="sm:col-span-3 flex items-center gap-3">
-                  <img src={brandingForm.logo} alt="Logo Preview" className="w-12 h-12 rounded-xl object-contain border border-slate-200 dark:border-slate-700 bg-white p-1" onError={e => e.target.style.display = 'none'} />
-                  <div className="w-8 h-8 rounded-lg flex-shrink-0" style={{ backgroundColor: brandingForm.brandingColor }} />
-                  <p className="text-xs text-slate-400">Logo & color preview</p>
-                </div>
-              )}
               <div className="sm:col-span-3 flex justify-end">
                 <button type="submit" disabled={brandingLoading} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition active:scale-95 disabled:opacity-60">
                   {brandingLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-4 h-4" />}

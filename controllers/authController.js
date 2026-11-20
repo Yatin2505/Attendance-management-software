@@ -194,8 +194,8 @@ const updateProfile = async (req, res) => {
     }
 
     user.name = name || user.name;
-    user.profilePhoto = profilePhoto || user.profilePhoto;
-    user.contactNumber = contactNumber || user.contactNumber;
+    user.profilePhoto = profilePhoto !== undefined ? profilePhoto : user.profilePhoto;
+    user.contactNumber = contactNumber !== undefined ? contactNumber : user.contactNumber;
 
     await user.save();
 
