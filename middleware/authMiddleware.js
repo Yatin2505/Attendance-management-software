@@ -21,6 +21,8 @@ const protect = async (req, res, next) => {
         return res.status(401).json({ message: 'Not authorized, user not found' });
       }
 
+      req.user.id = req.user._id.toString();
+
       // Check if user is active (default to true for existing records)
       if (req.user.isActive === false) {
         return res.status(403).json({ message: 'Account suspended. Please contact support.' });

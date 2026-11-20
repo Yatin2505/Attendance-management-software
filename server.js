@@ -2,7 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
-const testRoutes = require('./routes/testRoutes');
 const authRoutes = require('./routes/authRoutes');
 const studentRoutes = require('./routes/studentRoutes');
 const batchRoutes = require('./routes/batchRoutes');
@@ -57,7 +56,6 @@ app.get('/api/health', (req, res) => {
 });
 
 // Routes
-app.use('/api', testRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/students', studentRoutes);
