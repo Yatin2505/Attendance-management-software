@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download, Printer, X, CheckCircle, ShieldCheck, CreditCard, Building2, User, Calendar, FileText } from 'lucide-react';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import toast from 'react-hot-toast';
 
 const InvoiceModal = ({ isOpen, onClose, invoice }) => {
@@ -42,37 +42,314 @@ const InvoiceModal = ({ isOpen, onClose, invoice }) => {
     }
   };
 
+  const generateVectorPDF = () => {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const margin = 14;
+    const contentWidth = pageWidth - (margin * 2); // 182mm
+
+    // Top Brand Accent Stripe
+    doc.setFillColor(37, 99, 235);
+    doc.rect(0, 0, pageWidth, 5, 'F');
+
+    // Header Background Container
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(margin, 12, contentWidth, 32, 3, 3, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(margin, 12, contentWidth, 32, 3, 3, 'S');
+
+    // Logo (if base64 data URL) or Icon box
+    let textStartX = margin + 6;
+    if (instituteLogo && typeof instituteLogo === 'string' && instituteLogo.startsWith('data:image')) {
+      try {
+        const format = instituteLogo.includes('image/png') ? 'PNG' : 'JPEG';
+        doc.addImage(instituteLogo, format, margin + 6, 16, 24, 24);
+        textStartX = margin + 34;
+      } catch (imgErr) {
+        console.warn('Could not add logo to PDF:', imgErr);
+      }
+    }
+
+    // Institute Info (Left)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(15, 23, 42); // slate-900
+    doc.text(String(instituteName || 'Institute'), textStartX, 22);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.text('Coaching & Institute Management', textStartX, 28);
+    if (institute?.email) {
+      doc.text(String(institute.email), textStartX, 34);
+    } else if (institute?.contactNumber) {
+      doc.text('Contact: ' + String(institute.contactNumber), textStartX, 34);
+    }
+
+    // Receipt Badge & Meta (Right)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(5, 150, 105); // emerald-600
+    doc.text('FEE PAYMENT RECEIPT', pageWidth - margin - 6, 22, { align: 'right' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(30, 41, 59);
+    doc.text(`Invoice: #${invoiceNumber}`, pageWidth - margin - 6, 28, { align: 'right' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Date: ${fmtDate(paymentDate)}`, pageWidth - margin - 6, 34, { align: 'right' });
+
+    let yPos = 50;
+
+    // Student Details & Payment Details (Two Columns)
+    const colWidth = (contentWidth - 6) / 2;
+
+    // Left Box: Student Details
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(margin, yPos, colWidth, 30, 2, 2, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(margin, yPos, colWidth, 30, 2, 2, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.text('STUDENT DETAILS', margin + 5, yPos + 6.5);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(String(student?.name || 'Student'), margin + 5, yPos + 13.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Roll Number: #${student?.rollNumber || 'N/A'}`, margin + 5, yPos + 19.5);
+    if (student?.contactNumber) {
+      doc.text(`Contact: ${student.contactNumber}`, margin + 5, yPos + 25);
+    }
+
+    // Right Box: Payment Details
+    const rightColX = margin + colWidth + 6;
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(rightColX, yPos, colWidth, 30, 2, 2, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(rightColX, yPos, colWidth, 30, 2, 2, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text('PAYMENT DETAILS', rightColX + 5, yPos + 6.5);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${month || ''} ${year || ''}`.trim() || 'Tuition Fee', rightColX + 5, yPos + 13.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Payment Mode: ${paymentMethod || 'Cash'}`, rightColX + 5, yPos + 19.5);
+    doc.text(`Type: ${description || 'Monthly Tuition Fee'}`, rightColX + 5, yPos + 25);
+
+    yPos += 36;
+
+    // Fee Breakdown Table Header
+    doc.setFillColor(241, 245, 249); // slate-100
+    doc.rect(margin, yPos, contentWidth, 8, 'F');
+    doc.setDrawColor(203, 213, 225); // slate-300
+    doc.rect(margin, yPos, contentWidth, 8, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(51, 65, 85); // slate-700
+    doc.text('DESCRIPTION', margin + 5, yPos + 5.5);
+    doc.text('PERIOD / MODE', margin + (contentWidth / 2), yPos + 5.5, { align: 'center' });
+    doc.text('AMOUNT (INR)', margin + contentWidth - 5, yPos + 5.5, { align: 'right' });
+
+    yPos += 8;
+
+    // Row 1: Total Course / Batch Fee
+    doc.setFillColor(255, 255, 255);
+    doc.rect(margin, yPos, contentWidth, 10, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(margin, yPos, contentWidth, 10, 'S');
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Total Course / Batch Fee', margin + 5, yPos + 6.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`${month || ''} ${year || ''}`.trim() || '—', margin + (contentWidth / 2), yPos + 6.5, { align: 'center' });
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Rs. ${Number(totalAmount || 0).toLocaleString('en-IN')}`, margin + contentWidth - 5, yPos + 6.5, { align: 'right' });
+
+    yPos += 10;
+
+    // Row 2 (if previousPaid > 0): Previously Paid Amount
+    if (previousPaid > 0) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(margin, yPos, contentWidth, 9, 'F');
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(margin, yPos, contentWidth, 9, 'S');
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Previously Paid Amount', margin + 5, yPos + 6);
+      doc.text('—', margin + (contentWidth / 2), yPos + 6, { align: 'center' });
+      doc.text(`Rs. ${Number(previousPaid).toLocaleString('en-IN')}`, margin + contentWidth - 5, yPos + 6, { align: 'right' });
+
+      yPos += 9;
+    }
+
+    // Row 3: Current Paid Amount (Highlighted Emerald)
+    doc.setFillColor(236, 253, 245); // emerald-50
+    doc.rect(margin, yPos, contentWidth, 11, 'F');
+    doc.setDrawColor(167, 243, 208); // emerald-200
+    doc.rect(margin, yPos, contentWidth, 11, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(6, 95, 70); // emerald-800
+    doc.text('Amount Received in this Transaction', margin + 5, yPos + 7);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(4, 120, 87);
+    doc.text(paymentMethod || 'Cash', margin + (contentWidth / 2), yPos + 7, { align: 'center' });
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(4, 120, 87);
+    doc.text(`Rs. ${Number(amount || 0).toLocaleString('en-IN')}`, margin + contentWidth - 5, yPos + 7.5, { align: 'right' });
+
+    yPos += 11;
+
+    // Row 4: Remaining Pending Balance
+    doc.setFillColor(248, 250, 252);
+    doc.rect(margin, yPos, contentWidth, 10, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(margin, yPos, contentWidth, 10, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(51, 65, 85);
+    doc.text('Remaining Pending Balance', margin + 5, yPos + 6.5);
+
+    if (balanceAfter > 0) {
+      doc.setTextColor(225, 29, 72); // rose-600
+    } else {
+      doc.setTextColor(5, 150, 105); // emerald-600
+    }
+    doc.setFontSize(10);
+    doc.text(`Rs. ${Number(balanceAfter || 0).toLocaleString('en-IN')}`, margin + contentWidth - 5, yPos + 6.5, { align: 'right' });
+
+    yPos += 15;
+
+    // Remarks if any
+    if (remarks) {
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(margin, yPos, contentWidth, 9, 1.5, 1.5, 'F');
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(margin, yPos, contentWidth, 9, 1.5, 1.5, 'S');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(51, 65, 85);
+      doc.text('Remarks: ', margin + 5, yPos + 6);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
+      doc.text(String(remarks).slice(0, 85), margin + 20, yPos + 6);
+
+      yPos += 14;
+    }
+
+    // Status Seal Badge & Signature
+    doc.setFillColor(236, 253, 245);
+    doc.roundedRect(margin, yPos, 44, 13, 2, 2, 'F');
+    doc.setDrawColor(167, 243, 208);
+    doc.roundedRect(margin, yPos, 44, 13, 2, 2, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(6, 95, 70);
+    doc.text('STATUS: VERIFIED', margin + 5, yPos + 5.5);
+    doc.setFontSize(7);
+    doc.setTextColor(4, 120, 87);
+    doc.text('Official Institute Record', margin + 5, yPos + 9.5);
+
+    // Authorized Signature
+    const sigX = pageWidth - margin - 50;
+    doc.setDrawColor(203, 213, 225);
+    doc.line(sigX, yPos + 7, pageWidth - margin, yPos + 7);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(51, 65, 85);
+    doc.text('Authorized Signatory', pageWidth - margin - 25, yPos + 11, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
+    doc.text(String(instituteName || 'Institute'), pageWidth - margin - 25, yPos + 15, { align: 'center' });
+
+    // Bottom Note
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
+    doc.text('This is a computer-generated fee receipt and does not require a physical signature.', pageWidth / 2, pageHeight - 12, { align: 'center' });
+
+    doc.save(`Invoice_${invoiceNumber}.pdf`);
+  };
+
   const handleDownloadPDF = async () => {
-    if (!printableRef.current) return;
     setDownloading(true);
     const toastId = toast.loading('Generating PDF Invoice...');
 
     try {
-      const element = printableRef.current;
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
-      });
+      if (printableRef.current) {
+        const element = printableRef.current;
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff'
+        });
 
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4'
+        });
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-      // Center vertically if it fits on one page
-      pdf.addImage(imgData, 'PNG', 0, 5, pdfWidth, Math.min(pdfHeight, 285));
-      pdf.save(`Invoice_${invoiceNumber}.pdf`);
-      toast.success('Invoice downloaded successfully', { id: toastId });
+        pdf.addImage(imgData, 'PNG', 0, 5, pdfWidth, Math.min(pdfHeight, 285));
+        pdf.save(`Invoice_${invoiceNumber}.pdf`);
+        toast.success('Invoice downloaded successfully', { id: toastId });
+      } else {
+        generateVectorPDF();
+        toast.success('Invoice downloaded successfully', { id: toastId });
+      }
     } catch (err) {
-      console.error('Invoice PDF error:', err);
-      toast.error('Failed to generate PDF invoice', { id: toastId });
+      console.warn('Canvas export failed, switching to vector PDF receipt...', err);
+      try {
+        generateVectorPDF();
+        toast.success('Invoice downloaded successfully', { id: toastId });
+      } catch (fallbackErr) {
+        console.error('Invoice PDF error:', fallbackErr);
+        toast.error('Failed to generate PDF invoice', { id: toastId });
+      }
     } finally {
       setDownloading(false);
     }
@@ -149,7 +426,12 @@ const InvoiceModal = ({ isOpen, onClose, invoice }) => {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-slate-200">
                 <div className="flex items-center gap-3">
                   {instituteLogo ? (
-                    <img src={instituteLogo} alt="Logo" className="w-12 h-12 object-cover rounded-xl border border-slate-200" />
+                    <img
+                      src={instituteLogo}
+                      alt="Logo"
+                      crossOrigin="anonymous"
+                      className="w-12 h-12 object-cover rounded-xl border border-slate-200"
+                    />
                   ) : (
                     <div
                       className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md"
