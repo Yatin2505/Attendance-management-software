@@ -7,24 +7,29 @@ const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Synchronously initialize user from localStorage to render immediately (0ms latency)
+  const [user, setUser] = useState(() => getCurrentUser());
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
       const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const profile = await getMe();
-          setUser(profile);
-          localStorage.setItem('user', JSON.stringify(profile));
-        } catch (err) {
-          console.error("Failed to fetch fresh profile", err);
-          const cachedUser = getCurrentUser();
-          if (cachedUser) setUser(cachedUser);
+      if (!token) {
+        setUser(null);
+        return;
+      }
+      try {
+        const profile = await getMe();
+        setUser(profile);
+        localStorage.setItem('user', JSON.stringify(profile));
+      } catch (err) {
+        console.error("Failed to fetch fresh profile", err);
+        // If unauthorized/token expired, clear session
+        if (err.response?.status === 401) {
+          logoutService();
+          setUser(null);
         }
       }
-      setLoading(false);
     };
     fetchUser();
   }, []);
