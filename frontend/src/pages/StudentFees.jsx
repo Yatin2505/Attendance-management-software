@@ -51,7 +51,7 @@ const StudentFees = () => {
   const totals = fees.reduce((acc, f) => {
     acc.total += f.amount;
     acc.paid += f.paidAmount;
-    acc.pending += (f.amount - f.paidAmount);
+    acc.pending += Math.max(0, f.amount - f.paidAmount);
     return acc;
   }, { total: 0, paid: 0, pending: 0 });
 
@@ -178,7 +178,7 @@ const StudentFees = () => {
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-center">Balance</p>
-                    <p className="text-sm font-bold text-rose-500 text-center">₹{fee.amount - fee.paidAmount}</p>
+                    <p className="text-sm font-bold text-rose-500 text-center">₹{Math.max(0, fee.amount - fee.paidAmount)}</p>
                   </div>
                 </div>
 

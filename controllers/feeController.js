@@ -110,10 +110,26 @@ const recordPayment = async (req, res) => {
     if (user.role !== 'superadmin' && fee.instituteId.toString() !== myInst.toString()) {
       return res.status(403).json({ message: 'Access denied: Not your institute record' });
     }
+
+    const payAmount = Number(amount);
+    if (!payAmount || isNaN(payAmount) || payAmount <= 0) {
+      return res.status(400).json({ message: 'Payment amount must be greater than 0' });
+    }
+
+    const pendingAmount = Math.max(0, fee.amount - fee.paidAmount);
+    if (pendingAmount === 0) {
+      return res.status(400).json({ message: 'This fee record is already fully paid' });
+    }
+
+    if (payAmount > pendingAmount) {
+      return res.status(400).json({
+        message: `Payment amount (₹${payAmount}) cannot exceed the pending fee amount of ₹${pendingAmount}`
+      });
+    }
     
-    fee.paidAmount += Number(amount);
+    fee.paidAmount += payAmount;
     fee.paymentHistory.push({
-      amount: Number(amount), 
+      amount: payAmount, 
       paymentMethod, 
       remarks, 
       paymentDate: new Date()
@@ -227,7 +243,7 @@ const getFeeStats = async (req, res) => {
     const totals = stats[0] || { totalAmount: 0, totalPaid: 0 };
     res.status(200).json({
       totalCollected: totals.totalPaid,
-      totalPending:   totals.totalAmount - totals.totalPaid
+      totalPending:   Math.max(0, totals.totalAmount - totals.totalPaid)
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -246,7 +262,15 @@ const updateFee = async (req, res) => {
       return res.status(404).json({ message: 'Fee record not found' });
     }
 
-    if (amount !== undefined)      fee.amount = amount;
+    if (amount !== undefined) {
+      const newTotal = Number(amount);
+      if (newTotal < fee.paidAmount) {
+        return res.status(400).json({
+          message: `Total fee (₹${newTotal}) cannot be less than already paid amount of ₹${fee.paidAmount}`
+        });
+      }
+      fee.amount = newTotal;
+    }
     if (month !== undefined)       fee.month = month;
     if (year !== undefined)        fee.year = year;
     if (dueDate !== undefined)     fee.dueDate = dueDate;

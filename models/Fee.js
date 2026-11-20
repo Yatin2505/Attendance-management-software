@@ -64,7 +64,11 @@ const feeSchema = new mongoose.Schema({
 
 // Pre-save hook to update status based on paidAmount
 feeSchema.pre('save', async function() {
+  if (this.paidAmount < 0) {
+    this.paidAmount = 0;
+  }
   if (this.paidAmount >= this.amount) {
+    this.paidAmount = Math.min(this.paidAmount, this.amount);
     this.status = 'Paid';
   } else if (this.paidAmount > 0) {
     this.status = 'Partial';

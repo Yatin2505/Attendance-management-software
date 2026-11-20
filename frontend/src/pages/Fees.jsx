@@ -63,7 +63,7 @@ const Fees = () => {
     year: new Date().getFullYear(), dueDate: '', description: 'Monthly Tuition Fee'
   });
 
-  const [paymentData, setPaymentData] = useState({ feeId: '', studentName: '', amount: '', method: 'Cash', remarks: '' });
+  const [paymentData, setPaymentData] = useState({ feeId: '', studentName: '', amount: '', maxAmount: 0, method: 'Cash', remarks: '' });
   
   // Edit Modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -129,10 +129,20 @@ const Fees = () => {
 
   const handlePayment = async (e) => {
     e.preventDefault();
+    const payAmt = Number(paymentData.amount);
+    if (!payAmt || isNaN(payAmt) || payAmt <= 0) {
+      toast.error('Payment amount must be greater than 0');
+      return;
+    }
+    if (payAmt > paymentData.maxAmount) {
+      toast.error(`Payment amount cannot exceed the pending fee of ₹${paymentData.maxAmount}`);
+      return;
+    }
+
     setProcessing(true);
     try {
       await recordPayment(paymentData.feeId, {
-        amount: Number(paymentData.amount),
+        amount: payAmt,
         paymentMethod: paymentData.method,
         remarks: paymentData.remarks
       });
@@ -148,6 +158,12 @@ const Fees = () => {
 
   const handleEditFee = async (e) => {
     e.preventDefault();
+    const newTotal = Number(editFee.amount);
+    if (newTotal < (editFee.paidAmount || 0)) {
+      toast.error(`Total fee cannot be less than already paid amount of ₹${editFee.paidAmount}`);
+      return;
+    }
+
     setProcessing(true);
     try {
       await updateFee(editFee._id, editFee);
@@ -178,7 +194,7 @@ const Fees = () => {
       'Roll Number': f.studentId?.rollNumber,
       Amount: f.amount,
       Paid: f.paidAmount,
-      Balance: f.amount - f.paidAmount,
+      Balance: Math.max(0, f.amount - f.paidAmount),
       Status: f.status,
       Month: `${f.month} ${f.year}`,
       'Due Date': new Date(f.dueDate).toLocaleDateString()
@@ -303,7 +319,7 @@ const Fees = () => {
                   </td>
                   <td className="py-4 px-6">
                     <span className={`text-sm font-bold ${fee.amount - fee.paidAmount > 0 ? 'text-rose-500' : 'text-slate-400 opacity-40'}`}>
-                      ₹{fee.amount - fee.paidAmount}
+                      ₹{Math.max(0, fee.amount - fee.paidAmount)}
                     </span>
                   </td>
                   <td className="py-4 px-6">
@@ -314,7 +330,15 @@ const Fees = () => {
                       {fee.status !== 'Paid' && (
                         <button 
                           onClick={() => {
-                            setPaymentData({ feeId: fee._id, studentName: fee.studentId?.name, amount: fee.amount - fee.paidAmount, method: 'Cash', remarks: '' });
+                            const pending = Math.max(0, fee.amount - fee.paidAmount);
+                            setPaymentData({ 
+                              feeId: fee._id, 
+                              studentName: fee.studentId?.name, 
+                              amount: pending, 
+                              maxAmount: pending, 
+                              method: 'Cash', 
+                              remarks: '' 
+                            });
                             setIsPaymentModalOpen(true);
                           }}
                           className="p-2 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white rounded-lg transition-all"
@@ -482,8 +506,30 @@ const Fees = () => {
                    <p className="text-lg font-bold text-slate-800 dark:text-white leading-tight">{paymentData.studentName}</p>
                 </div>
                 <div>
-                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Amount (₹)</label>
-                   <input type="number" required value={paymentData.amount} onChange={e => setPaymentData({...paymentData, amount: e.target.value})} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-lg font-display font-bold text-primary-600" />
+                   <div className="flex justify-between items-center mb-1.5">
+                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amount (₹)</label>
+                     <span className="text-xs font-bold text-rose-500 bg-rose-50 dark:bg-rose-500/10 px-2 py-0.5 rounded-md">
+                       Max Pending: ₹{paymentData.maxAmount}
+                     </span>
+                   </div>
+                   <input 
+                     type="number" 
+                     required 
+                     min="1"
+                     max={paymentData.maxAmount}
+                     value={paymentData.amount} 
+                     onChange={e => setPaymentData({...paymentData, amount: e.target.value})} 
+                     className={`w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-white/5 border text-lg font-display font-bold transition-all ${
+                       Number(paymentData.amount) > paymentData.maxAmount 
+                         ? 'border-rose-500 text-rose-600 focus:ring-rose-500/50' 
+                         : 'border-slate-200 dark:border-white/10 text-primary-600 focus:ring-primary-500/50'
+                     }`} 
+                   />
+                   {Number(paymentData.amount) > paymentData.maxAmount && (
+                     <p className="text-xs text-rose-500 font-semibold mt-1.5 flex items-center gap-1">
+                       ⚠️ Amount cannot exceed total pending fee of ₹{paymentData.maxAmount}
+                     </p>
+                   )}
                 </div>
                 <div>
                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Payment Method</label>
@@ -504,8 +550,8 @@ const Fees = () => {
                   <textarea value={paymentData.remarks} onChange={e => setPaymentData({...paymentData, remarks: e.target.value})} className="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs h-16 resize-none" placeholder="e.g. Paid in full" />
                 </div>
                 <button 
-                  disabled={processing}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/25 transition-all active:scale-95 disabled:opacity-50"
+                  disabled={processing || Number(paymentData.amount) > paymentData.maxAmount || Number(paymentData.amount) <= 0}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/25 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {processing ? 'Processing...' : 'Confirm Payment'}
                 </button>
